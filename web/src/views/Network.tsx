@@ -130,7 +130,7 @@ export function Network({ state }: { state: AppState }) {
               return (
                 <g key={n.id} transform={`translate(${n.x},${n.y})`} opacity={dim} onClick={(e) => { e.stopPropagation(); setFocus(n.ringId ?? null); }} className="gnode">
                   {n.ringId && <circle r={r + 6} className="pulse" />}
-                  <circle r={r} fill={fill} stroke="#050a16" strokeWidth={2} />
+                  <circle r={r} fill={fill} stroke="#09090d" strokeWidth={2} />
                   <text y={r + 12} textAnchor="middle" className="glabel">{n.label}</text>
                   <title>{`${n.label}\n${n.orders} order(s) · ${usd(n.amount ?? 0)}\naccount ${n.accountAgeDays}d old · max risk ${n.maxRisk}`}</title>
                 </g>

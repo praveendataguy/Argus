@@ -39,15 +39,15 @@ export function App() {
             <svg viewBox="0 0 40 40">
               <defs>
                 <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stopColor="#3b8cff" />
-                  <stop offset="0.6" stopColor="#0070e0" />
-                  <stop offset="1" stopColor="#14d3a0" />
+                  <stop offset="0" stopColor="#ffe08a" />
+                  <stop offset="0.55" stopColor="#ffc439" />
+                  <stop offset="1" stopColor="#ff9f1c" />
                 </linearGradient>
               </defs>
               <path d="M20 2 35 8v11c0 9.5-6.3 16.6-15 19C11.3 35.6 5 28.5 5 19V8z" fill="url(#lg)" />
-              <path d="M10.5 20c2.6-4.2 5.8-6.3 9.5-6.3s6.9 2.1 9.5 6.3c-2.6 4.2-5.8 6.3-9.5 6.3s-6.9-2.1-9.5-6.3z" fill="#050a16" opacity="0.9" />
+              <path d="M10.5 20c2.6-4.2 5.8-6.3 9.5-6.3s6.9 2.1 9.5 6.3c-2.6 4.2-5.8 6.3-9.5 6.3s-6.9-2.1-9.5-6.3z" fill="#0b0b10" opacity="0.92" />
               <circle cx="20" cy="20" r="3.6" fill="#fff" />
-              <circle cx="20" cy="20" r="1.6" fill="#0070e0" />
+              <circle cx="20" cy="20" r="1.6" fill="#003087" />
             </svg>
           </span>
           <div>

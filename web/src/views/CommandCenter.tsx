@@ -20,11 +20,27 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
 
   return (
     <div className="cc">
+      <section className="panel hero">
+        <Radar txs={txs} />
+        <div>
+          <h1>
+            Argus is guarding <em>{usd(gross)}</em> in PayPal payments
+          </h1>
+          <p>Every capture is scored, linked and watched by AI agents. Money only moves inside the policy you set, and every decision is signed and logged.</p>
+          <div className="hero-stats">
+            <div><b>{txs.filter((t) => t.risk).length}</b><span>payments scored</span></div>
+            <div><b>{txs.filter((t) => (t.risk?.score ?? 0) >= 60).length}</b><span>high-risk caught</span></div>
+            <div><b>{state.approvals.filter((a) => a.status === "EXECUTED").length}</b><span>actions executed</span></div>
+            <div><b>{state.events.length}</b><span>agent events</span></div>
+          </div>
+        </div>
+      </section>
+
       <section className="kpis">
-        <Kpi label="Gross volume" value={usd(gross)} sub={`${txs.length} PayPal captures`} />
-        <Kpi label="Fraud stopped" value={usd(blocked)} sub="held or cancelled before shipping" tone="green" />
-        <Kpi label="Dispute exposure" value={usd(exposure)} sub={`${state.disputes.filter((d) => d.status !== "RESOLVED").length} open cases`} tone="amber" />
-        <Kpi label="Awaiting you" value={String(pending.length)} sub={`auto-approve ≤ ${usd(config.autoApproveLimit)} in Guarded`} tone={pending.length ? "red" : undefined} />
+        <Kpi label="Gross volume" value={usd(gross)} sub={`${txs.length} PayPal captures`} spark={daily(txs, (t) => t.amount)} />
+        <Kpi label="Fraud stopped" value={usd(blocked)} sub="held or cancelled before shipping" tone="green" spark={txs.filter((t) => t.risk).map((t) => t.risk!.score)} />
+        <Kpi label="Dispute exposure" value={usd(exposure)} sub={`${state.disputes.filter((d) => d.status !== "RESOLVED").length} open cases`} tone="amber" spark={daily(txs, (t) => (t.buyer.accountAgeDays < 30 ? t.amount : 0))} />
+        <Kpi label="Awaiting you" value={String(pending.length)} sub={`auto-approve ≤ ${usd(config.autoApproveLimit)} in Guarded`} tone={pending.length ? "red" : undefined} spark={cumulative(state.approvals.map((a) => a.createdAt))} />
       </section>
 
       <section className="sim">
@@ -70,13 +86,97 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
   );
 }
 
-function Kpi({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: string }) {
+const TONE: Record<string, string> = { green: "#2ee59d", amber: "#ffc439", red: "#ff4d6d" };
+
+function Kpi({ label, value, sub, tone, spark }: { label: string; value: string; sub: string; tone?: string; spark?: number[] }) {
   return (
     <div className={`kpi ${tone ? `kpi-${tone}` : ""}`}>
       <div className="kpi-label">{label}</div>
       <div className="kpi-value">{value}</div>
       <div className="kpi-sub">{sub}</div>
+      {spark && spark.length > 1 && <Spark values={spark} color={TONE[tone ?? ""] ?? "#ffc439"} />}
     </div>
+  );
+}
+
+/** Daily totals over the last 14 days. */
+function daily<T extends { createdAt: string }>(xs: T[], f: (x: T) => number) {
+  const days = Array(14).fill(0);
+  const now = Date.now();
+  for (const x of xs) {
+    const d = Math.floor((now - Date.parse(x.createdAt)) / 86_400_000);
+    if (d >= 0 && d < 14) days[13 - d] += f(x);
+  }
+  return days;
+}
+
+const cumulative = (isos: string[]) => {
+  const s = [...isos].sort();
+  return s.map((_, i) => i + 1);
+};
+
+function Spark({ values, color }: { values: number[]; color: string }) {
+  const W = 200;
+  const H = 34;
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const pts = values.map((v, i) => [(i / (values.length - 1)) * W, H - 3 - ((v - min) / (max - min || 1)) * (H - 6)]);
+  const line = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const id = `sg${color.slice(1)}`;
+  return (
+    <svg className="spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={color} stopOpacity="0.35" />
+          <stop offset="1" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`${line} L${W},${H} L0,${H} Z`} fill={`url(#${id})`} />
+      <path d={line} fill="none" stroke={color} strokeWidth="1.8" vectorEffect="non-scaling-stroke" style={{ filter: `drop-shadow(0 0 4px ${color})` }} />
+    </svg>
+  );
+}
+
+/** Live threat radar: each payment is a blip; riskier ones sit closer to the centre. */
+function Radar({ txs }: { txs: AppState["transactions"] }) {
+  const C = 110;
+  const hash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const blips = txs.slice(-40).map((t, i) => {
+    const score = t.risk?.score ?? 20;
+    const a = i * 2.39996; // golden angle spreads blips evenly
+    const r = 16 + (1 - score / 100) * 70 + (hash(t.id) % 14);
+    return { id: t.id, x: C + r * Math.cos(a), y: C + r * Math.sin(a), score, delay: ((hash(t.id) % 360) / 360) * 3.2, scored: Boolean(t.risk) };
+  });
+  return (
+    <svg className="radar" viewBox="0 0 220 220" role="img" aria-label="Threat radar of recent payments">
+      <defs>
+        <radialGradient id="rbg">
+          <stop offset="0" stopColor="#ffc439" stopOpacity="0.12" />
+          <stop offset="1" stopColor="#ffc439" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="beam" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#ffc439" stopOpacity="0" />
+          <stop offset="1" stopColor="#ffc439" stopOpacity="0.55" />
+        </linearGradient>
+      </defs>
+      <circle cx={C} cy={C} r={104} fill="url(#rbg)" stroke="rgba(255,196,57,0.35)" />
+      {[78, 52, 26].map((r) => <circle key={r} cx={C} cy={C} r={r} fill="none" stroke="rgba(255,255,255,0.08)" />)}
+      <line x1={C - 104} y1={C} x2={C + 104} y2={C} stroke="rgba(255,255,255,0.06)" />
+      <line x1={C} y1={C - 104} x2={C} y2={C + 104} stroke="rgba(255,255,255,0.06)" />
+      <g className="radar-sweep">
+        <path d={`M${C},${C} L${C + 104},${C} A104,104 0 0,0 ${C + 104 * Math.cos(-0.6)},${C + 104 * Math.sin(-0.6)} Z`} fill="url(#beam)" />
+        <line x1={C} y1={C} x2={C + 104} y2={C} stroke="#ffc439" strokeWidth="1.5" style={{ filter: "drop-shadow(0 0 6px #ffc439)" }} />
+      </g>
+      {blips.map((b) => {
+        const color = b.score >= 60 ? "#ff4d6d" : b.score >= 30 ? "#ffc439" : "#2ee59d";
+        return (
+          <circle key={b.id} className="blip" cx={b.x} cy={b.y} r={b.score >= 60 ? 4.5 : 3} fill={color} style={{ animationDelay: `${b.delay}s`, filter: `drop-shadow(0 0 5px ${color})` }}>
+            <title>{`${b.id}: ${b.scored ? `risk ${b.score}` : "not scored yet"}`}</title>
+          </circle>
+        );
+      })}
+      <circle cx={C} cy={C} r={4} fill="#ffc439" />
+    </svg>
   );
 }
 

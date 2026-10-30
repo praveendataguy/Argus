@@ -62,9 +62,9 @@ interface Game {
   rules: Rule[];
 }
 
-// Validated (dark surface) two-series palette: first contact vs. after learning.
-const BEFORE = "#b5781a";
-const AFTER = "#5b8def";
+// Two-series palette on the dark surface: first contact (coral) vs. after learning (PayPal yellow).
+const BEFORE = "#ff4d6d";
+const AFTER = "#ffc439";
 
 export function WarGame({ state }: { state: AppState }) {
   const [game, setGame] = useState<Game | null>(null);
