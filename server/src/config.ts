@@ -16,12 +16,12 @@ export const config = {
     clientSecret: env.PAYPAL_CLIENT_SECRET ?? "",
     webhookId: env.PAYPAL_WEBHOOK_ID ?? "",
     baseUrl: env.PAYPAL_API_BASE ?? "https://api-m.sandbox.paypal.com",
-    merchantEmail: env.PAYPAL_MERCHANT_EMAIL ?? "merchant@sentinelpay.example",
+    merchantEmail: env.PAYPAL_MERCHANT_EMAIL ?? "merchant@arguspay.example",
   },
 
   anthropic: {
     enabled: Boolean(env.ANTHROPIC_API_KEY || env.ANTHROPIC_AUTH_TOKEN),
-    model: env.SENTINEL_MODEL ?? "claude-opus-5-5",
+    model: env.ARGUS_MODEL ?? "claude-opus-5-5",
   },
 
   policy: {

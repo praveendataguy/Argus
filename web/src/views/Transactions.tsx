@@ -106,7 +106,7 @@ function TxDetail({ tx, onClose }: { tx: Transaction; onClose: () => void }) {
         <p className="muted">Not analysed yet.</p>
       )}
       <button className="primary" onClick={() => api(`/transactions/${tx.id}/analyse`, {})}>
-        {tx.risk ? "Re-analyse with Risk Sentinel" : "Analyse with Risk Sentinel"}
+        {tx.risk ? "Re-analyse with Risk Watch" : "Analyse with Risk Watch"}
       </button>
     </aside>
   );

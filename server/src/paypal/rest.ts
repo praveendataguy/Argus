@@ -174,7 +174,7 @@ export class PayPalRestGateway implements PayPalGateway {
 
   async createPayout({ receiverEmail, amount, currency, note }: Parameters<PayPalGateway["createPayout"]>[0]) {
     const res = await this.call<{ batch_header: { payout_batch_id: string; batch_status: string } }>("POST", "/v1/payments/payouts", {
-      sender_batch_header: { sender_batch_id: crypto.randomUUID(), email_subject: "You have a payout from Sentinel Pay" },
+      sender_batch_header: { sender_batch_id: crypto.randomUUID(), email_subject: "You have a payout from Argus" },
       items: [{ recipient_type: "EMAIL", amount: { value: amount.toFixed(2), currency }, receiver: receiverEmail, note }],
     });
     return { batchId: res.batch_header.payout_batch_id, status: res.batch_header.batch_status };

@@ -1,17 +1,19 @@
-# 🛡️ Sentinel Pay
+# 👁️ Argus
 
 **An autonomous AI back office that guards a PayPal merchant account.**
 
-Small online sellers lose money in three places: fraud they don't catch before shipping, disputes they don't have time to fight (or fight when they shouldn't), and billing that slips. Sentinel Pay puts a team of AI agents in charge of the PayPal account, with a policy engine and a human approval queue in front of every dollar that moves.
+*Named after Argus Panoptes, the hundred-eyed watchman of Greek myth: many agents, always watching, and a human holding the leash.*
+
+Small online sellers lose money in three places: fraud they don't catch before shipping, disputes they don't have time to fight (or fight when they shouldn't), and billing that slips. Argus puts a team of AI agents in charge of the PayPal account, with a policy engine and a human approval queue in front of every dollar that moves.
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 
 | Agent | Watches | Does | PayPal APIs |
 |---|---|---|---|
-| **Risk Sentinel** 🛡️ | Every captured payment | Scores fraud risk from deterministic signals plus reasoning, then allows, flags, holds or cancels and refunds | Orders v2, Payments v2 (refunds), Webhooks |
+| **Risk Watch** 🛡️ | Every captured payment | Scores fraud risk from deterministic signals plus reasoning, then allows, flags, holds or cancels and refunds | Orders v2, Payments v2 (refunds), Webhooks |
 | **Dispute Agent** ⚖️ | Every PayPal dispute | Reads the case, tracking, support tickets and QA notes, estimates win probability, drafts the evidence response or recommends accepting | Disputes v1 (list, provide-evidence, accept-claim) |
 | **Billing Agent** 🧾 | Free-text requests | Turns an email, note or voice transcript into a PayPal invoice | Invoicing v2 |
-| **Sentinel Copilot** 💬 | The merchant | Answers questions and carries out instructions ("refund $20 on TX-1039", "pay our affiliate $40") | All of the above, plus Payouts v1 |
+| **Argus Copilot** 💬 | The merchant | Answers questions and carries out instructions ("refund $20 on TX-1039", "pay our affiliate $40") | All of the above, plus Payouts v1 |
 
 ### Guardrails: AI behind the wheel, human on the brake
 
@@ -55,7 +57,7 @@ Agents can't move money directly. They can only *request* an action, and the pol
 Requires Node 20+.
 
 ```bash
-git clone <this repo> && cd sentinel-pay
+git clone <this repo> && cd argus
 npm install
 cp .env.example .env      # optional: add PayPal sandbox + Anthropic keys
 npm run dev               # API on :8787, dashboard on http://localhost:5173
@@ -80,7 +82,7 @@ npm run build && npm start   # http://localhost:8787
 1. At [developer.paypal.com](https://developer.paypal.com/dashboard/applications/sandbox), create a sandbox REST app. Copy its Client ID and Secret into `.env`.
 2. Set `PAYPAL_MERCHANT_EMAIL` to the app's sandbox business account email.
 3. Optional: add a webhook pointing at `https://<your-host>/api/webhooks/paypal` for `PAYMENT.CAPTURE.COMPLETED` and `CUSTOMER.DISPUTE.CREATED`, and put its ID in `PAYPAL_WEBHOOK_ID`.
-4. Open the **Storefront** tab and pay with a sandbox personal account. The real capture shows up in the Command Center and Risk Sentinel screens it within seconds. Refunds you approve on it are real sandbox refunds.
+4. Open the **Storefront** tab and pay with a sandbox personal account. The real capture shows up in the Command Center and Risk Watch screens it within seconds. Refunds you approve on it are real sandbox refunds.
 
 The seeded history (about 40 orders and 3 disputes for the demo shop "Nimbus Audio") and the traffic simulator buttons use the simulator gateway, because PayPal's sandbox can't produce card-testing bursts or account takeovers on demand. Anything that goes through real checkout uses the real sandbox APIs.
 

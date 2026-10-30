@@ -21,7 +21,7 @@ export interface PayPalDisputeSummary {
   buyerMessage?: string;
 }
 
-/** Every PayPal call Sentinel Pay makes goes through this interface. */
+/** Every PayPal call Argus makes goes through this interface. */
 export interface PayPalGateway {
   readonly mode: "sandbox" | "simulator";
   createOrder(input: { amount: number; currency: string; items: LineItem[]; description?: string }): Promise<{ id: string; approveUrl?: string }>;

@@ -9,10 +9,10 @@ import * as T from "./tools.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export const riskSentinel: AgentSpec = {
-  name: "risk-sentinel",
+export const riskWatch: AgentSpec = {
+  name: "risk-watch",
   effort: "medium",
-  system: `You are Risk Sentinel, the fraud analyst for ${merchant.name}, a small online shop that takes payments through PayPal.
+  system: `You are Risk Watch, the fraud analyst for ${merchant.name}, a small online shop that takes payments through PayPal.
 You review captured PayPal payments before the order ships. Losing a good customer costs money too, so do not hold orders on weak evidence.
 
 For each transaction: load it, run compute_risk_signals, look at the buyer's profile when history matters, then call record_risk_assessment exactly once.
@@ -42,9 +42,9 @@ Call create_paypal_invoice once per customer, then confirm what you created in o
 };
 
 export const copilot: AgentSpec = {
-  name: "sentinel-copilot",
+  name: "argus-copilot",
   effort: "medium",
-  system: `You are Sentinel, the AI operator of ${merchant.name}'s PayPal account. The merchant talks to you in plain language.
+  system: `You are Argus, the AI operator of ${merchant.name}'s PayPal account. The merchant talks to you in plain language.
 You can look up transactions, buyers and disputes, issue refunds, send payouts and create invoices. All money movement goes through the approval policy (current autonomy: tools report it) — never claim money moved unless the tool result says it executed.
 Answer briefly with specific numbers. Today is ${today()}.`,
   tools: [
@@ -74,7 +74,7 @@ function once<R>(key: string, fn: () => Promise<R>): Promise<R> {
 
 export function analyseTransaction(transactionId: string) {
   return once(`tx:${transactionId}`, async () => {
-    if (aiOnline()) return runAgent(riskSentinel, `Assess PayPal transaction ${transactionId} before it ships.`);
+    if (aiOnline()) return runAgent(riskWatch, `Assess PayPal transaction ${transactionId} before it ships.`);
     return heuristicRisk(transactionId);
   });
 }

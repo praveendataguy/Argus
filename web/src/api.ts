@@ -13,7 +13,7 @@ export async function api<T = unknown>(path: string, body?: unknown): Promise<T>
 }
 
 /** Loads state once, then keeps it live from the server's event stream. */
-export function useSentinel() {
+export function useArgus() {
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [state, setState] = useState<AppState | null>(null);
   const [connected, setConnected] = useState(false);

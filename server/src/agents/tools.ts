@@ -80,7 +80,7 @@ export const getBuyerProfile = defineTool({
 export const computeRiskSignals = defineTool({
   name: "compute_risk_signals",
   description:
-    "Run Sentinel's deterministic fraud-signal engine on a transaction (velocity, account age, geo mismatch, amount outliers, account-takeover patterns). Positive weights add risk, negative weights reduce it.",
+    "Run Argus's deterministic fraud-signal engine on a transaction (velocity, account age, geo mismatch, amount outliers, account-takeover patterns). Positive weights add risk, negative weights reduce it.",
   inputSchema: z.object({ transactionId: z.string() }),
   run: async ({ transactionId }) => {
     const t = store.transactions.get(transactionId);

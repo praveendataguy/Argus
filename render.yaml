@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: sentinel-pay
+    name: argus
     runtime: node
     plan: free
     buildCommand: npm ci && npm run build

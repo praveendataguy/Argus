@@ -1,5 +1,5 @@
 {
-  "name": "sentinel-pay",
+  "name": "argus",
   "private": true,
   "version": "0.1.0",
   "description": "An autonomous AI back office that guards a PayPal merchant account: risk, disputes and billing agents with a human approval queue.",

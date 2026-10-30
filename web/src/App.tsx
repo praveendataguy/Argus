@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api, useSentinel } from "./api";
+import { api, useArgus } from "./api";
 import type { Autonomy } from "./types";
 import { Billing } from "./views/Billing";
 import { CommandCenter } from "./views/CommandCenter";
@@ -17,10 +17,10 @@ const AUTONOMY: { value: Autonomy; label: string; hint: string }[] = [
 ];
 
 export function App() {
-  const { config, state, connected } = useSentinel();
+  const { config, state, connected } = useArgus();
   const [tab, setTab] = useState<Tab>("Command Center");
 
-  if (!config || !state) return <div className="boot">Starting Sentinel…</div>;
+  if (!config || !state) return <div className="boot">Starting Argus…</div>;
 
   const pending = state.approvals.filter((a) => a.status === "PENDING").length;
   const openDisputes = state.disputes.filter((d) => d.status !== "RESOLVED").length;
@@ -29,9 +29,9 @@ export function App() {
     <div className="shell">
       <header className="topbar">
         <div className="brand">
-          <span className="logo">🛡️</span>
+          <span className="logo">👁️</span>
           <div>
-            <div className="brand-name">Sentinel Pay</div>
+            <div className="brand-name">Argus</div>
             <div className="brand-sub">guarding {config.merchant.name}</div>
           </div>
         </div>

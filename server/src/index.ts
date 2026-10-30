@@ -217,7 +217,7 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 app.listen(config.port, () => {
-  console.log(`Sentinel Pay on http://localhost:${config.port}`);
+  console.log(`Argus on http://localhost:${config.port}`);
   console.log(`  PayPal: ${paypalMode}${paypalMode === "simulator" ? " (set PAYPAL_CLIENT_ID/SECRET for the real sandbox)" : ""}`);
   console.log(`  AI: ${aiOnline() ? config.anthropic.model : "offline rules engine (set ANTHROPIC_API_KEY)"}`);
 });

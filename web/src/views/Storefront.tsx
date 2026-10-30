@@ -7,7 +7,7 @@ type Cart = Record<string, number>;
 
 /**
  * A tiny shop for the demo merchant. Checkout runs through PayPal Orders v2;
- * every capture is handed to Risk Sentinel before the order ships.
+ * every capture is handed to Risk Watch before the order ships.
  */
 export function Storefront({ config }: { config: AppConfig }) {
   const [cart, setCart] = useState<Cart>({});
@@ -50,7 +50,7 @@ export function Storefront({ config }: { config: AppConfig }) {
 
       <aside className="checkout panel">
         <h3>Cart · {usd(total)}</h3>
-        {done && <div className="answer">✅ Paid. Order {done} is now being screened by Risk Sentinel.</div>}
+        {done && <div className="answer">✅ Paid. Order {done} is now being screened by Risk Watch.</div>}
         {error && <div className="answer">⚠️ {error}</div>}
         {lines.length > 0 &&
           (config.paypalMode === "sandbox" && config.paypalClientId ? (

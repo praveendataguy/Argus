@@ -115,10 +115,10 @@ function ApprovalCard({ a }: { a: Approval }) {
 }
 
 const AGENT_ICON: Record<string, string> = {
-  "risk-sentinel": "🛡️",
+  "risk-watch": "🛡️",
   "dispute-agent": "⚖️",
   "billing-agent": "🧾",
-  "sentinel-copilot": "💬",
+  "argus-copilot": "💬",
   "policy-engine": "⚙️",
   "rules-engine": "📐",
   paypal: "🅿️",
@@ -182,7 +182,7 @@ function Copilot({ enabled }: { enabled: boolean }) {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder={enabled ? "Ask Sentinel or tell it what to do…" : "Copilot needs ANTHROPIC_API_KEY"}
+          placeholder={enabled ? "Ask Argus or tell it what to do…" : "Copilot needs ANTHROPIC_API_KEY"}
           disabled={!enabled || busy}
         />
         <button className="primary" disabled={!enabled || busy}>
