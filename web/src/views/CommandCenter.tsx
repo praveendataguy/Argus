@@ -119,6 +119,8 @@ const AGENT_ICON: Record<string, string> = {
   "dispute-agent": "⚖️",
   "billing-agent": "🧾",
   "ring-hunter": "🕸️",
+  "red-team": "🗡️",
+  "blue-team": "🛡️",
   "argus-copilot": "💬",
   "policy-engine": "⚙️",
   "rules-engine": "📐",

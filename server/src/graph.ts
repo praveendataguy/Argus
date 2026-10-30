@@ -57,8 +57,7 @@ function attributes(t: Transaction): { kind: NodeKind; key: string; label: strin
  * Builds the identity graph (accounts linked through shared devices, IP ranges
  * and shipping addresses) and finds connected groups of accounts — likely rings.
  */
-export function buildGraph() {
-  const txs = [...store.transactions.values()];
+export function buildGraph(txs: Transaction[] = [...store.transactions.values()]) {
   const accounts = new Map<string, Transaction[]>();
   for (const t of txs) {
     const key = t.buyer.email.toLowerCase();
@@ -133,8 +132,8 @@ export function buildGraph() {
 }
 
 /** Other accounts that share a device, IP range or address with this buyer. */
-export function linkedAccounts(email: string) {
-  const { rings } = buildGraph();
+export function linkedAccounts(email: string, pool?: Transaction[]) {
+  const { rings } = buildGraph(pool);
   const ring = rings.find((r) => r.accounts.includes(email.toLowerCase()));
   return ring ? { ring, others: ring.accounts.filter((a) => a !== email.toLowerCase()) } : null;
 }

@@ -5,6 +5,8 @@ import { fileURLToPath } from "node:url";
 import { executeApproval, rejectApproval } from "./actions.js";
 import { aiOnline, analyseDispute, analyseRing, analyseTransaction, askCopilot, draftInvoices } from "./agents/index.js";
 import { buildGraph } from "./graph.js";
+import { describeRule, learnedRules } from "./rules.js";
+import { CATCH_SCORE, game, playRound, resetGame, toggleRule } from "./wargame.js";
 import { catalog, merchant, productBySku } from "./catalog.js";
 import { config, paypalMode } from "./config.js";
 import { paypal } from "./paypal/index.js";
@@ -120,6 +122,30 @@ app.post("/api/rings/:id/analyse", (req, res) => {
   background("Ring analysis", analyseRing(String(req.params.id)));
   res.status(202).json({ ok: true });
 });
+
+/* ---------------- War game ---------------- */
+
+app.get("/api/wargame", (_req, res) => {
+  res.json({
+    running: game.running,
+    catchScore: CATCH_SCORE,
+    rounds: game.rounds.map(({ orders, ...r }) => ({ ...r, orders: orders.map(({ tx, ...o }) => o) })),
+    rules: learnedRules.map((r) => ({ ...r, description: describeRule(r) })),
+  });
+});
+
+app.post("/api/wargame/round", (_req, res) => {
+  if (game.running) return res.status(409).json({ error: "A round is already running" });
+  background("War game", playRound());
+  res.status(202).json({ ok: true });
+});
+
+app.post("/api/wargame/reset", (_req, res) => {
+  resetGame();
+  res.json({ ok: true });
+});
+
+app.post("/api/wargame/rules/:id", wrap(async (req, res) => res.json(toggleRule(String(req.params.id), Boolean(req.body?.enabled)))));
 
 app.post("/api/approvals/:id/approve", wrap(async (req, res) => res.json(await executeApproval(String(req.params.id)))));
 app.post("/api/approvals/:id/reject", wrap(async (req, res) => res.json(await rejectApproval(String(req.params.id)))));

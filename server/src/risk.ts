@@ -1,4 +1,5 @@
 import { linkedAccounts } from "./graph.js";
+import { activeRules, matches } from "./rules.js";
 import { store, type RiskLevel, type Transaction } from "./store.js";
 
 export interface RiskSignal {
@@ -15,10 +16,10 @@ const DISPOSABLE_DOMAINS = ["mailinator.com", "tempmail.dev", "guerrillamail.com
  * history) rather than guessing from scratch, and the heuristic fallback uses
  * them directly when no model is configured.
  */
-export function computeSignals(tx: Transaction): RiskSignal[] {
+export function computeSignals(tx: Transaction, pool: Transaction[] = [...store.transactions.values()]): RiskSignal[] {
   const signals: RiskSignal[] = [];
-  const all = [...store.transactions.values()];
-  const history = store.buyerHistory(tx.buyer.email).filter((t) => t.id !== tx.id);
+  const all = pool;
+  const history = pool.filter((t) => t.id !== tx.id && t.buyer.email.toLowerCase() === tx.buyer.email.toLowerCase());
   const created = Date.parse(tx.createdAt);
 
   const lastHour = history.filter((t) => Math.abs(created - Date.parse(t.createdAt)) <= 3_600_000);
@@ -64,7 +65,7 @@ export function computeSignals(tx: Transaction): RiskSignal[] {
   const priorDisputes = [...store.disputes.values()].filter((d) => history.some((h) => h.id === d.transactionId));
   if (priorDisputes.length) signals.push({ id: "prior_disputes", label: "Prior disputes", weight: 12 * priorDisputes.length, detail: `${priorDisputes.length} earlier dispute(s)` });
 
-  const linked = linkedAccounts(tx.buyer.email);
+  const linked = linkedAccounts(tx.buyer.email, pool);
   if (linked)
     signals.push({
       id: "linked_accounts",
@@ -72,6 +73,12 @@ export function computeSignals(tx: Transaction): RiskSignal[] {
       weight: 10 + linked.others.length * 6,
       detail: `Shares ${linked.ring.sharedSignals.map((s) => s.kind).join(", ")} with ${linked.others.length} other account(s) (${linked.ring.id}, ${linked.ring.orders.length} orders)`,
     });
+
+  for (const rule of activeRules()) {
+    if (matches(rule, tx)) {
+      signals.push({ id: `rule:${rule.id}`, label: `Learned rule: ${rule.name}`, weight: rule.weight, detail: `${rule.name} (learned in war game round ${rule.createdRound})` });
+    }
+  }
 
   return signals;
 }
