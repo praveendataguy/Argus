@@ -35,7 +35,7 @@ interface Graph {
 
 const W = 900;
 const H = 620;
-const KIND_COLOR: Record<Kind, string> = { account: "#93c5fd", device: "#c084fc", ip: "#22d3ee", address: "#fbbf24" };
+const KIND_COLOR: Record<Kind, string> = { account: "#93c5fd", device: "#c084fc", ip: "#22d3ee", address: "#f7c55e" };
 const KIND_ICON: Record<Kind, string> = { account: "👤", device: "📱", ip: "🌐", address: "📦" };
 
 /** Lays the graph out once per change of shape, keeping positions of nodes that already exist. */
@@ -100,7 +100,7 @@ export function Network({ state }: { state: AppState }) {
                 <i style={{ background: KIND_COLOR[k] }} /> {k === "ip" ? "IP range" : k}
               </span>
             ))}
-            <span><i style={{ background: "#ef4444" }} /> ring</span>
+            <span><i style={{ background: "#ff5c72" }} /> ring</span>
           </div>
         </div>
         <svg viewBox={`0 0 ${W} ${H}`} className="graph" onClick={() => setFocus(null)}>
@@ -126,11 +126,11 @@ export function Network({ state }: { state: AppState }) {
             const dim = inFocus(n) ? 1 : 0.2;
             if (n.kind === "account") {
               const r = 6 + Math.min(12, Math.sqrt(n.amount ?? 0) / 4);
-              const fill = n.ringId ? "#ef4444" : (n.maxRisk ?? 0) >= 60 ? "#f97316" : KIND_COLOR.account;
+              const fill = n.ringId ? "#ff5c72" : (n.maxRisk ?? 0) >= 60 ? "#f97316" : KIND_COLOR.account;
               return (
                 <g key={n.id} transform={`translate(${n.x},${n.y})`} opacity={dim} onClick={(e) => { e.stopPropagation(); setFocus(n.ringId ?? null); }} className="gnode">
                   {n.ringId && <circle r={r + 6} className="pulse" />}
-                  <circle r={r} fill={fill} stroke="#0a101c" strokeWidth={2} />
+                  <circle r={r} fill={fill} stroke="#050a16" strokeWidth={2} />
                   <text y={r + 12} textAnchor="middle" className="glabel">{n.label}</text>
                   <title>{`${n.label}\n${n.orders} order(s) · ${usd(n.amount ?? 0)}\naccount ${n.accountAgeDays}d old · max risk ${n.maxRisk}`}</title>
                 </g>

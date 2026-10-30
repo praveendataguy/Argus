@@ -7,14 +7,14 @@ import type { AppState, Transaction } from "../types";
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 const gridTheme = themeQuartz.withPart(colorSchemeDark).withParams({
-  backgroundColor: "#0f1626",
-  foregroundColor: "#dbe4f3",
-  headerBackgroundColor: "#121b2e",
-  accentColor: "#3b82f6",
-  borderColor: "#1f2a40",
+  backgroundColor: "#0a1222",
+  foregroundColor: "#e8eef8",
+  headerBackgroundColor: "#0d172b",
+  accentColor: "#2b7fff",
+  borderColor: "#18253d",
   fontFamily: "Inter, system-ui, sans-serif",
   fontSize: 13,
-  rowHoverColor: "#16223a",
+  rowHoverColor: "#112040",
 });
 
 function RiskCell({ data }: ICellRendererParams<Transaction>) {
