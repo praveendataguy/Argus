@@ -82,6 +82,7 @@ const KIND_LABEL: Record<string, string> = {
   DISPUTE_ACCEPT: "Accept claim",
   INVOICE_SEND: "Send invoice",
   RELEASE_HOLD: "Release hold",
+  AGENT_PAYMENT: "Agent payment",
 };
 
 function ApprovalCard({ a }: { a: Approval }) {
@@ -104,7 +105,7 @@ function ApprovalCard({ a }: { a: Approval }) {
       <p className="approval-why">{a.rationale}</p>
       <div className="approval-actions">
         <button className="primary" disabled={busy} onClick={() => act("approve")}>
-          Approve{a.kind === "REFUND" || a.kind === "PAYOUT" || a.kind === "DISPUTE_ACCEPT" ? " & move money" : ""}
+          Approve{["REFUND", "PAYOUT", "DISPUTE_ACCEPT", "AGENT_PAYMENT"].includes(a.kind) ? " & move money" : ""}
         </button>
         <button disabled={busy} onClick={() => act("reject")}>
           Reject
@@ -120,6 +121,8 @@ const AGENT_ICON: Record<string, string> = {
   "billing-agent": "🧾",
   "ring-hunter": "🕸️",
   "red-team": "🗡️",
+  "argus-firewall": "🧱",
+  "office-bot": "🤖",
   "blue-team": "🛡️",
   "argus-copilot": "💬",
   "policy-engine": "⚙️",

@@ -4,12 +4,13 @@ import type { Autonomy } from "./types";
 import { Billing } from "./views/Billing";
 import { CommandCenter } from "./views/CommandCenter";
 import { Disputes } from "./views/Disputes";
+import { Firewall } from "./views/Firewall";
 import { Network } from "./views/Network";
 import { Storefront } from "./views/Storefront";
 import { Transactions } from "./views/Transactions";
 import { WarGame } from "./views/WarGame";
 
-const TABS = ["Command Center", "Transactions", "Fraud Rings", "War Game", "Disputes", "Billing", "Storefront"] as const;
+const TABS = ["Command Center", "Transactions", "Fraud Rings", "War Game", "Agent Firewall", "Disputes", "Billing", "Storefront"] as const;
 type Tab = (typeof TABS)[number];
 
 const AUTONOMY: { value: Autonomy; label: string; hint: string }[] = [
@@ -77,6 +78,7 @@ export function App() {
         {tab === "Transactions" && <Transactions state={state} />}
         {tab === "Fraud Rings" && <Network state={state} />}
         {tab === "War Game" && <WarGame state={state} />}
+        {tab === "Agent Firewall" && <Firewall config={config} state={state} />}
         {tab === "Disputes" && <Disputes state={state} />}
         {tab === "Billing" && <Billing config={config} state={state} />}
         {tab === "Storefront" && <Storefront config={config} />}

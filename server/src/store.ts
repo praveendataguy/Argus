@@ -84,7 +84,7 @@ export interface Invoice {
   source: "ai" | "manual";
 }
 
-export type ApprovalKind = "REFUND" | "PAYOUT" | "DISPUTE_RESPONSE" | "DISPUTE_ACCEPT" | "INVOICE_SEND" | "RELEASE_HOLD";
+export type ApprovalKind = "REFUND" | "PAYOUT" | "DISPUTE_RESPONSE" | "DISPUTE_ACCEPT" | "INVOICE_SEND" | "RELEASE_HOLD" | "AGENT_PAYMENT";
 
 export interface Approval {
   id: string;
@@ -130,7 +130,7 @@ class Store extends EventEmitter {
     return event;
   }
 
-  changed(entity: "transactions" | "disputes" | "invoices" | "approvals" | "settings" | "wargame") {
+  changed(entity: "transactions" | "disputes" | "invoices" | "approvals" | "settings" | "wargame" | "firewall") {
     this.emit("changed", entity);
   }
 

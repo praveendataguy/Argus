@@ -1,4 +1,5 @@
 import { config } from "./config.js";
+import { agentPayments, releaseReservation } from "./firewall.js";
 import { gatewayFor, paypal } from "./paypal/index.js";
 import { newId, store, type Approval, type ApprovalKind } from "./store.js";
 
@@ -24,9 +25,12 @@ export function policyAllowsAuto(kind: ApprovalKind, amount: number): { auto: bo
 }
 
 /** Every money-moving or customer-facing agent action is funnelled through here. */
-export async function requestAction(input: Omit<Approval, "id" | "createdAt" | "status">): Promise<Approval> {
-  const approval: Approval = { ...input, id: newId("APR"), createdAt: new Date().toISOString(), status: "PENDING" };
-  const { auto, why } = policyAllowsAuto(approval.kind, approval.amount);
+export async function requestAction(input: Omit<Approval, "id" | "createdAt" | "status"> & { forceAuto?: boolean }): Promise<Approval> {
+  const { forceAuto, ...rest } = input;
+  const approval: Approval = { ...rest, id: newId("APR"), createdAt: new Date().toISOString(), status: "PENDING" };
+  const policy = policyAllowsAuto(approval.kind, approval.amount);
+  // The agent firewall has already applied the owner's mandate, so it can pre-approve.
+  const { auto, why } = forceAuto && store.autonomy !== "observe" ? { auto: true, why: "Within the agent's mandate and approved by the firewall." } : policy;
   store.upsertApproval(approval);
   store.log({ agent: approval.requestedBy, kind: "decision", message: `Requested: ${approval.title}. ${why}`, data: { approvalId: approval.id } });
   if (auto) {
@@ -43,6 +47,12 @@ export async function rejectApproval(id: string, by = "human") {
   a.decidedAt = new Date().toISOString();
   store.upsertApproval(a);
   store.log({ agent: by, kind: "action", message: `Rejected: ${a.title}` });
+  if (a.kind === "AGENT_PAYMENT") {
+    releaseReservation(String(a.payload.agentId), a.amount);
+    const p = agentPayments.find((x) => x.id === a.payload.paymentId);
+    if (p) p.verdict = "blocked";
+    store.changed("firewall");
+  }
   if (a.kind === "RELEASE_HOLD" || a.kind === "REFUND") {
     const tx = store.transactions.get(String(a.payload.transactionId));
     if (tx && a.kind === "REFUND" && tx.status === "HELD") {
@@ -64,6 +74,14 @@ export async function executeApproval(id: string, by: "human" | "policy" = "huma
   try {
     a.result = await run(a);
     a.status = "EXECUTED";
+    if (a.kind === "AGENT_PAYMENT") {
+      const p = agentPayments.find((x) => x.id === a.payload.paymentId);
+      if (p) {
+        p.verdict = "approved";
+        p.reference = a.result;
+        store.changed("firewall");
+      }
+    }
     store.log({
       agent: by === "policy" ? "policy-engine" : "human",
       kind: "action",
@@ -134,6 +152,7 @@ async function run(a: Approval): Promise<string> {
       store.upsertInvoice(inv);
       return `PayPal invoice #${inv.number} sent to ${inv.recipientEmail}`;
     }
+    case "AGENT_PAYMENT":
     case "PAYOUT": {
       const res = await paypal.createPayout({
         receiverEmail: String(p.receiverEmail),

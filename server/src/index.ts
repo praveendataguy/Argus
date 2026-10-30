@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 import { executeApproval, rejectApproval } from "./actions.js";
 import { aiOnline, analyseDispute, analyseRing, analyseTransaction, askCopilot, draftInvoices } from "./agents/index.js";
 import { buildGraph } from "./graph.js";
+import { agentPayments, mandates, payees, runLiveShopper, scenarios } from "./firewall.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { createMcpServer } from "./mcp.js";
 import { describeRule, learnedRules } from "./rules.js";
 import { CATCH_SCORE, game, playRound, resetGame, toggleRule } from "./wargame.js";
 import { catalog, merchant, productBySku } from "./catalog.js";
@@ -122,6 +125,43 @@ app.post("/api/rings/:id/analyse", (req, res) => {
   background("Ring analysis", analyseRing(String(req.params.id)));
   res.status(202).json({ ok: true });
 });
+
+/* ---------------- Agent payment firewall ---------------- */
+
+app.get("/api/firewall", (_req, res) => {
+  res.json({
+    mandates,
+    payees,
+    payments: agentPayments.slice(0, 50),
+    scenarios: Object.entries(scenarios).map(([id, s]) => ({ id, label: s.label })),
+    mcpUrl: `${config.publicUrl}/mcp`,
+  });
+});
+
+app.post("/api/firewall/scenario/:id", wrap(async (req, res) => {
+  const s = scenarios[String(req.params.id)];
+  if (!s) return res.status(404).json({ error: "Unknown scenario" });
+  res.json(await s.run());
+}));
+
+app.post("/api/firewall/live-agent", (_req, res) => {
+  if (!aiOnline()) return res.status(400).json({ error: "The live agent needs ANTHROPIC_API_KEY" });
+  background("Live shopping agent", runLiveShopper());
+  res.status(202).json({ ok: true });
+});
+
+// MCP endpoint (stateless Streamable HTTP): a fresh server per request.
+app.post("/mcp", wrap(async (req, res) => {
+  const server = createMcpServer();
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  res.on("close", () => {
+    transport.close();
+    server.close();
+  });
+  await server.connect(transport);
+  await transport.handleRequest(req, res, req.body);
+}));
+app.all("/mcp", (_req, res) => res.status(405).json({ error: "Use POST for MCP requests" }));
 
 /* ---------------- War game ---------------- */
 
@@ -250,7 +290,7 @@ app.post("/api/webhooks/paypal", wrap(async (req, res) => {
 const webDist = join(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
 if (existsSync(webDist)) {
   app.use(express.static(webDist));
-  app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(join(webDist, "index.html")));
+  app.get(/^\/(?!api\/|mcp).*/, (_req, res) => res.sendFile(join(webDist, "index.html")));
 }
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
