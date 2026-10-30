@@ -434,10 +434,10 @@ input:focus, textarea:focus { outline: none; border-color: var(--yellow); box-sh
   border: 1px solid transparent;
   border-radius: 16px;
   background:
-    linear-gradient(180deg, rgba(23, 23, 31, 0.92), rgba(15, 15, 20, 0.92)) padding-box,
+    linear-gradient(180deg, rgba(23, 23, 31, 0.84), rgba(15, 15, 20, 0.86)) padding-box,
     linear-gradient(140deg, rgba(255, 196, 57, 0.45), rgba(255, 255, 255, 0.06) 35%, rgba(255, 255, 255, 0.04) 65%, rgba(0, 156, 222, 0.35)) border-box;
   box-shadow: var(--shadow);
-  backdrop-filter: blur(6px);
+
 }
 .panel h2 { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
 .kpi { position: relative; overflow: hidden; padding: 16px 18px 12px; }
@@ -480,3 +480,4 @@ input:focus, textarea:focus { outline: none; border-color: var(--yellow); box-sh
   .hero { grid-template-columns: 1fr; justify-items: center; text-align: center; }
   .hero-stats { justify-content: center; }
 }
+.backdrop { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; }

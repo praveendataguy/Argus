@@ -11,6 +11,7 @@ import { Storefront } from "./views/Storefront";
 import { Transactions } from "./views/Transactions";
 import { TrustCenter } from "./views/TrustCenter";
 import { Voice } from "./Voice";
+import { Backdrop } from "./Backdrop";
 import { WarGame } from "./views/WarGame";
 
 const TABS = ["Command Center", "Transactions", "Fraud Rings", "War Game", "Agent Firewall", "Trust Center", "Disputes", "Billing", "Storefront", "Observability"] as const;
@@ -33,6 +34,7 @@ export function App() {
 
   return (
     <div className="shell">
+      <Backdrop />
       <header className="topbar">
         <div className="brand">
           <span className="logo" aria-hidden>
