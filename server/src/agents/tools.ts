@@ -3,6 +3,7 @@ import { requestAction } from "../actions.js";
 import { catalog, merchant } from "../catalog.js";
 import { config } from "../config.js";
 import { paypal } from "../paypal/index.js";
+import { buildGraph } from "../graph.js";
 import { computeSignals, levelFor } from "../risk.js";
 import { fulfillmentRecords } from "../seed.js";
 import { store, type Transaction } from "../store.js";
@@ -272,3 +273,60 @@ export const getBusinessSnapshot = defineTool({
   },
 });
 
+
+export const getFraudRings = defineTool({
+  name: "get_fraud_rings",
+  description:
+    "Find groups of buyer accounts linked by a shared device fingerprint, IP /24 range or (normalised) shipping address. Returns each ring with its accounts, orders, shared signals and a structural score.",
+  inputSchema: z.object({ ringId: z.string().optional() }),
+  run: async ({ ringId }) => {
+    const { rings } = buildGraph();
+    const pick = ringId ? rings.filter((r) => r.id === ringId) : rings;
+    return pick.map((r) => ({
+      ...r,
+      orderDetails: r.orders.map((id) => {
+        const t = store.transactions.get(id)!;
+        return { id, at: t.createdAt, buyer: t.buyer.email, amount: t.amount, status: t.status, items: t.items.map((i) => i.name), shipTo: t.fingerprint.address, ip: t.fingerprint.ip };
+      }),
+    }));
+  },
+});
+
+export const actOnRing = defineTool({
+  name: "act_on_ring",
+  description:
+    "Record your verdict on a ring. 'fraud' holds every unrefunded order in the ring and queues refunds to cancel them; 'benign' marks it as a legitimate shared household or office.",
+  inputSchema: z.object({
+    ringId: z.string(),
+    verdict: z.enum(["fraud", "benign"]),
+    explanation: z.string().describe("Two or three sentences a merchant can read: what links these accounts and why it is or isn't fraud"),
+  }),
+  run: async ({ ringId, verdict, explanation }, ctx) => {
+    const ring = buildGraph().rings.find((r) => r.id === ringId);
+    if (!ring) throw new Error(`No ring ${ringId}`);
+    store.ringVerdicts.set(ring.accounts.slice().sort().join("|"), { verdict, explanation, at: new Date().toISOString(), by: ctx.agent });
+    store.changed("transactions");
+    if (verdict === "benign") return "Marked benign.";
+    let queued = 0;
+    for (const id of ring.orders) {
+      const t = store.transactions.get(id)!;
+      const open = t.amount - t.refundedAmount;
+      if (open <= 0) continue;
+      const already = [...store.approvals.values()].some((a) => a.status === "PENDING" && a.payload.transactionId === id && a.kind === "REFUND");
+      if (already) continue;
+      t.status = "HELD";
+      store.upsertTransaction(t);
+      await requestAction({
+        kind: "REFUND",
+        requestedBy: ctx.agent,
+        title: `Cancel ring order ${t.id} ($${open.toFixed(2)}) — ${ring.id}`,
+        rationale: explanation,
+        amount: open,
+        currency: t.currency,
+        payload: { transactionId: t.id, note: "Your order was cancelled after a security review." },
+      });
+      queued++;
+    }
+    return `Ring ${ringId} marked fraud; ${queued} order(s) held and queued for cancellation.`;
+  },
+});

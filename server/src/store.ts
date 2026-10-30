@@ -39,6 +39,8 @@ export interface Transaction {
   shipping: { country: string; city: string; method: string; trackingNumber?: string; delivered?: boolean };
   ipCountry: string;
   device: string;
+  /** Identity signals used to link accounts: IP address, device fingerprint, normalised shipping address. */
+  fingerprint: { ip: string; deviceId: string; address: string };
   status: "COMPLETED" | "HELD" | "REFUNDED" | "PARTIALLY_REFUNDED";
   refundedAmount: number;
   source: "seed" | "paypal-sandbox" | "simulator";
@@ -117,6 +119,8 @@ class Store extends EventEmitter {
   approvals = new Map<string, Approval>();
   events: AgentEvent[] = [];
   autonomy: "observe" | "guarded" | "autopilot" = "guarded";
+  /** Ring verdicts keyed by the sorted member emails, so they survive ring renumbering. */
+  ringVerdicts = new Map<string, { verdict: "fraud" | "benign"; explanation: string; at: string; by: string }>();
 
   log(e: Omit<AgentEvent, "id" | "ts">): AgentEvent {
     const event: AgentEvent = { id: randomUUID(), ts: new Date().toISOString(), ...e };

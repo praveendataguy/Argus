@@ -4,10 +4,11 @@ import type { Autonomy } from "./types";
 import { Billing } from "./views/Billing";
 import { CommandCenter } from "./views/CommandCenter";
 import { Disputes } from "./views/Disputes";
+import { Network } from "./views/Network";
 import { Storefront } from "./views/Storefront";
 import { Transactions } from "./views/Transactions";
 
-const TABS = ["Command Center", "Transactions", "Disputes", "Billing", "Storefront"] as const;
+const TABS = ["Command Center", "Transactions", "Fraud Rings", "Disputes", "Billing", "Storefront"] as const;
 type Tab = (typeof TABS)[number];
 
 const AUTONOMY: { value: Autonomy; label: string; hint: string }[] = [
@@ -73,6 +74,7 @@ export function App() {
       <main>
         {tab === "Command Center" && <CommandCenter config={config} state={state} />}
         {tab === "Transactions" && <Transactions state={state} />}
+        {tab === "Fraud Rings" && <Network state={state} />}
         {tab === "Disputes" && <Disputes state={state} />}
         {tab === "Billing" && <Billing config={config} state={state} />}
         {tab === "Storefront" && <Storefront config={config} />}

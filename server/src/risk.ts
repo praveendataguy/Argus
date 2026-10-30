@@ -1,3 +1,4 @@
+import { linkedAccounts } from "./graph.js";
 import { store, type RiskLevel, type Transaction } from "./store.js";
 
 export interface RiskSignal {
@@ -62,6 +63,15 @@ export function computeSignals(tx: Transaction): RiskSignal[] {
 
   const priorDisputes = [...store.disputes.values()].filter((d) => history.some((h) => h.id === d.transactionId));
   if (priorDisputes.length) signals.push({ id: "prior_disputes", label: "Prior disputes", weight: 12 * priorDisputes.length, detail: `${priorDisputes.length} earlier dispute(s)` });
+
+  const linked = linkedAccounts(tx.buyer.email);
+  if (linked)
+    signals.push({
+      id: "linked_accounts",
+      label: "Linked to other accounts",
+      weight: 10 + linked.others.length * 6,
+      detail: `Shares ${linked.ring.sharedSignals.map((s) => s.kind).join(", ")} with ${linked.others.length} other account(s) (${linked.ring.id}, ${linked.ring.orders.length} orders)`,
+    });
 
   return signals;
 }

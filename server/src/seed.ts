@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { catalog } from "./catalog.js";
 import { computeSignals, heuristicScore, levelFor } from "./risk.js";
 import { store, type Buyer, type Dispute, type LineItem, type Transaction } from "./store.js";
@@ -29,9 +30,11 @@ function makeTx(
   buyer: Buyer,
   items: LineItem[],
   at: number,
-  extra: Partial<Pick<Transaction, "ipCountry" | "device" | "shipping">> & { city?: string } = {},
+  extra: Partial<Pick<Transaction, "ipCountry" | "device" | "shipping" | "fingerprint">> & { city?: string } = {},
 ): Transaction {
   const amount = items.reduce((s, i) => s + i.unitAmount * i.quantity, 0);
+  const device = extra.device ?? "Unknown";
+  const ipCountry = extra.ipCountry ?? buyer.country;
   return {
     id: nextId(),
     orderId: ppId("5O"),
@@ -42,13 +45,33 @@ function makeTx(
     items,
     buyer,
     shipping: extra.shipping ?? { country: buyer.country, city: extra.city ?? "", method: amount > 300 ? "tracked-signature" : "tracked", trackingNumber: ppId("1Z"), delivered: at > 60 * 24 * 3 },
-    ipCountry: extra.ipCountry ?? buyer.country,
-    device: extra.device ?? "Unknown",
+    ipCountry,
+    device,
+    fingerprint: extra.fingerprint ?? fingerprintFor(buyer.email, device, ipCountry, extra.city ?? extra.shipping?.city ?? ""),
     status: "COMPLETED",
     refundedAmount: 0,
     source: "seed",
   };
 }
+
+const h = (s: string, n = 6) => createHash("sha1").update(s).digest("hex").slice(0, n);
+
+/** Stable per-person identity signals, so honest buyers never collide with each other. */
+export function fingerprintFor(email: string, device: string, ipCountry: string, city: string) {
+  const ipHash = parseInt(h(email + ipCountry, 4), 16);
+  return {
+    ip: `${(ipHash % 200) + 20}.${(ipHash >> 3) % 250}.${(ipHash >> 5) % 250}.${(ipHash % 97) + 2}`,
+    deviceId: `dev-${h(email + device)}`,
+    address: `${(parseInt(h(email, 3), 16) % 900) + 10} ${h(email + "st", 4).toUpperCase()} St, ${city || "?"}`,
+  };
+}
+
+/** The shared identity behind the fraud ring: one phone farm, one drop address. */
+export const RING = {
+  deviceId: "dev-7f3a91",
+  address: "41 Larkin St Apt 3, San Francisco",
+  ip: (n: number) => `185.220.101.${30 + n}`,
+};
 
 const line = (sku: string, quantity = 1): LineItem => {
   const p = catalog.find((c) => c.sku === sku)!;
@@ -70,9 +93,28 @@ export function seedDemoData() {
   // Story 1: card-testing / reseller burst from a brand-new account.
   const burner: Buyer = { name: "J. Smith", email: "deals4u.8812@tempmail.dev", country: "US", accountAgeDays: 1 };
   const burnerShip = { country: "NG", city: "Lagos", method: "express", trackingNumber: ppId("1Z"), delivered: false };
-  txs.push(makeTx(burner, [line("NA-PEBBLE")], 52, { ipCountry: "RO", device: "Linux / Headless Chrome", shipping: burnerShip }));
-  txs.push(makeTx(burner, [line("NA-ORBIT", 2)], 41, { ipCountry: "RO", device: "Linux / Headless Chrome", shipping: burnerShip }));
-  txs.push(makeTx(burner, [line("NA-MONO", 4)], 33, { ipCountry: "RO", device: "Linux / Headless Chrome", shipping: burnerShip }));
+  const burnerFp = { ip: RING.ip(9), deviceId: RING.deviceId, address: "12 Adeola Odeku St, Lagos" };
+  txs.push(makeTx(burner, [line("NA-PEBBLE")], 52, { ipCountry: "RO", device: "Linux / Headless Chrome", shipping: burnerShip, fingerprint: burnerFp }));
+  txs.push(makeTx(burner, [line("NA-ORBIT", 2)], 41, { ipCountry: "RO", device: "Linux / Headless Chrome", shipping: burnerShip, fingerprint: burnerFp }));
+  txs.push(makeTx(burner, [line("NA-MONO", 4)], 33, { ipCountry: "RO", device: "Linux / Headless Chrome", shipping: burnerShip, fingerprint: burnerFp }));
+
+  // Story 3: a quiet fraud ring. Each account places one modest, plausible order,
+  // but they share a device fingerprint, a drop address and an exit-node IP range.
+  const ring: [Buyer, string, number][] = [
+    [{ name: "Emily Rhodes", email: "emily.rhodes.92@gmail.com", country: "US", accountAgeDays: 19 }, "NA-DAC", 60 * 24 * 6],
+    [{ name: "Marcus Webb", email: "mwebb.audio@outlook.com", country: "US", accountAgeDays: 14 }, "NA-ORBIT", 60 * 24 * 4 + 200],
+    [{ name: "Chloe Park", email: "chloepark.music@yahoo.com", country: "US", accountAgeDays: 11 }, "NA-DAC", 60 * 24 * 2 + 90],
+    [{ name: "Ryan Cole", email: "ryan.cole.sf@gmail.com", country: "US", accountAgeDays: 8 }, "NA-ORBIT", 60 * 26],
+  ];
+  ring.forEach(([buyer, sku, at], n) =>
+    txs.push(
+      makeTx(buyer, [line(sku)], at, {
+        device: "iPhone / Safari",
+        shipping: { country: "US", city: "San Francisco", method: "tracked", trackingNumber: ppId("1Z"), delivered: at > 60 * 24 * 3 },
+        fingerprint: { ip: RING.ip(n), deviceId: RING.deviceId, address: n === 3 ? "41 Larkin Street #3, San Francisco" : RING.address },
+      }),
+    ),
+  );
 
   // Story 2: a loyal customer's account suddenly used from a new device and country.
   const hannah = regulars.find((r) => r.name === "Hannah Kim")!;

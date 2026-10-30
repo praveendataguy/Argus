@@ -3,7 +3,8 @@ import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { executeApproval, rejectApproval } from "./actions.js";
-import { aiOnline, analyseDispute, analyseTransaction, askCopilot, draftInvoices } from "./agents/index.js";
+import { aiOnline, analyseDispute, analyseRing, analyseTransaction, askCopilot, draftInvoices } from "./agents/index.js";
+import { buildGraph } from "./graph.js";
 import { catalog, merchant, productBySku } from "./catalog.js";
 import { config, paypalMode } from "./config.js";
 import { paypal } from "./paypal/index.js";
@@ -109,6 +110,17 @@ app.post("/api/disputes/sync", wrap(async (_req, res) => {
   res.json({ synced: remote.length });
 }));
 
+app.get("/api/graph", (_req, res) => {
+  const graph = buildGraph();
+  const rings = graph.rings.map((r) => ({ ...r, verdict: store.ringVerdicts.get(r.accounts.slice().sort().join("|")) ?? null }));
+  res.json({ ...graph, rings });
+});
+
+app.post("/api/rings/:id/analyse", (req, res) => {
+  background("Ring analysis", analyseRing(String(req.params.id)));
+  res.status(202).json({ ok: true });
+});
+
 app.post("/api/approvals/:id/approve", wrap(async (req, res) => res.json(await executeApproval(String(req.params.id)))));
 app.post("/api/approvals/:id/reject", wrap(async (req, res) => res.json(await rejectApproval(String(req.params.id)))));
 
@@ -162,6 +174,11 @@ app.post("/api/checkout/orders/:id/capture", wrap(async (req, res) => {
     shipping: { country: capture.shipping?.country ?? country, city: capture.shipping?.city ?? "", method: capture.amount > 300 ? "tracked-signature" : "tracked" },
     ipCountry: country,
     device: String(req.headers["user-agent"] ?? "Unknown").slice(0, 60),
+    fingerprint: {
+      ip: String(req.headers["x-forwarded-for"] ?? req.socket.remoteAddress ?? "0.0.0.0").split(",")[0].replace("::ffff:", ""),
+      deviceId: `dev-${capture.payer.payerId ?? "unknown"}`,
+      address: `${capture.shipping?.city ?? ""}, ${capture.shipping?.country ?? country}`,
+    },
     status: "COMPLETED",
     refundedAmount: 0,
     source: paypalMode === "sandbox" ? "paypal-sandbox" : "simulator",

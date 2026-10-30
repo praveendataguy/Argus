@@ -1,6 +1,7 @@
 import { requestAction } from "../actions.js";
 import { catalog, merchant } from "../catalog.js";
 import { config } from "../config.js";
+import { buildGraph } from "../graph.js";
 import { computeSignals, heuristicScore, levelFor } from "../risk.js";
 import { fulfillmentRecords } from "../seed.js";
 import { store } from "../store.js";
@@ -60,6 +61,16 @@ Answer briefly with specific numbers. Today is ${today()}.`,
   ],
 };
 
+export const ringHunter: AgentSpec = {
+  name: "ring-hunter",
+  effort: "high",
+  system: `You are Ring Hunter, the fraud-network investigator for ${merchant.name}. Organised fraud spreads small, normal-looking orders across many fresh accounts that secretly share infrastructure.
+Load the ring with get_fraud_rings, look at the buyers' profiles if useful, and decide whether it is a fraud ring or a benign cluster (a family sharing a home, an office sharing a network).
+Weigh: account ages, how many independent signals are shared (device + IP range + address is far stronger than one), address-formatting tricks, timing, product choice (resellable electronics) and any risk already scored.
+Call act_on_ring exactly once. Then give the merchant a short plain-English briefing.`,
+  tools: [T.getFraudRings, T.getBuyerProfile, T.getTransaction, T.actOnRing],
+};
+
 export const aiOnline = () => client !== null;
 
 // One analysis per transaction at a time, so a webhook and a button click don't race.
@@ -86,6 +97,13 @@ export function analyseDispute(disputeId: string) {
   });
 }
 
+export function analyseRing(ringId: string) {
+  return once(`ring:${ringId}`, async () => {
+    if (aiOnline()) return runAgent(ringHunter, `Investigate ${ringId} and decide whether it is a fraud ring.`);
+    return heuristicRing(ringId);
+  });
+}
+
 export async function draftInvoices(request: string) {
   if (!aiOnline()) throw new Error("Invoice drafting from free text needs an Anthropic API key (set ANTHROPIC_API_KEY).");
   return runAgent(billingAgent, request);
@@ -97,6 +115,17 @@ export async function askCopilot(question: string) {
 }
 
 /* ---------- Offline fallbacks: keep the app usable without an API key ---------- */
+
+async function heuristicRing(ringId: string) {
+  const ring = buildGraph().rings.find((r) => r.id === ringId);
+  if (!ring) throw new Error(`No ring ${ringId}`);
+  const kinds = new Set(ring.sharedSignals.map((s) => s.kind));
+  const verdict = kinds.size >= 2 && ring.avgAccountAgeDays < 60 ? "fraud" : "benign";
+  const explanation = `Rules engine (AI offline): ${ring.accounts.length} accounts share ${[...kinds].join(", ")}; average account age ${ring.avgAccountAgeDays} days.`;
+  const tool = T.actOnRing({ agent: "rules-engine", runId: "heuristic" });
+  await tool.run({ ringId, verdict, explanation });
+  return { runId: "heuristic", text: explanation };
+}
 
 async function heuristicRisk(transactionId: string) {
   const tx = store.transactions.get(transactionId);

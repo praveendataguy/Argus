@@ -1,6 +1,7 @@
 import { productBySku } from "./catalog.js";
 import { config } from "./config.js";
 import { simulator } from "./paypal/index.js";
+import { fingerprintFor, RING } from "./seed.js";
 import { newId, store, type Buyer, type LineItem, type Transaction } from "./store.js";
 
 export type Scenario = "normal" | "card-testing" | "account-takeover" | "reseller";
@@ -10,7 +11,9 @@ const line = (sku: string, quantity = 1): LineItem => {
   return { name: p.name, quantity, unitAmount: p.price };
 };
 
-const scenarios: Record<Scenario, () => { buyer: Buyer; items: LineItem[]; ip: string; device: string; ship: Transaction["shipping"] }> = {
+type Made = { buyer: Buyer; items: LineItem[]; ip: string; device: string; ship: Transaction["shipping"]; fingerprint?: Transaction["fingerprint"] };
+
+const scenarios: Record<Scenario, () => Made> = {
   normal: () => ({
     buyer: { name: "Grace Okafor", email: "grace.okafor@gmail.com", country: "CA", accountAgeDays: 1500 },
     items: [line("NA-PEBBLE"), line("NA-CABLE")],
@@ -24,6 +27,8 @@ const scenarios: Record<Scenario, () => { buyer: Buyer; items: LineItem[]; ip: s
     ip: "BR",
     device: "Linux / Headless Chrome",
     ship: { country: "US", city: "Doral (freight forwarder)", method: "express" },
+    // Same phone farm as the seeded ring, so the network view lights up live.
+    fingerprint: { ip: RING.ip(40 + Math.floor(Math.random() * 50)), deviceId: RING.deviceId, address: "8400 NW 25th St, Doral" },
   }),
   "account-takeover": () => ({
     buyer: { name: "Arjun Mehta", email: "arjun.mehta@outlook.com", country: "IN", accountAgeDays: 1310 },
@@ -64,6 +69,7 @@ export async function simulateOrder(scenario: Scenario): Promise<Transaction> {
     shipping: s.ship,
     ipCountry: s.ip,
     device: s.device,
+    fingerprint: s.fingerprint ?? fingerprintFor(s.buyer.email, s.device, s.ip, s.ship.city),
     status: "COMPLETED",
     refundedAmount: 0,
     source: "simulator",

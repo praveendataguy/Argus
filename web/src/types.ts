@@ -19,6 +19,7 @@ export interface Transaction {
   shipping: { country: string; city: string; method: string; trackingNumber?: string; delivered?: boolean };
   ipCountry: string;
   device: string;
+  fingerprint: { ip: string; deviceId: string; address: string };
   status: "COMPLETED" | "HELD" | "REFUNDED" | "PARTIALLY_REFUNDED";
   refundedAmount: number;
   source: "seed" | "paypal-sandbox" | "simulator";
