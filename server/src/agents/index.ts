@@ -5,7 +5,7 @@ import { buildGraph } from "../graph.js";
 import { computeSignals, heuristicScore, levelFor } from "../risk.js";
 import { fulfillmentRecords } from "../seed.js";
 import { store } from "../store.js";
-import { client, runAgent, type AgentSpec } from "./llm.js";
+import { client, runAgent, runHeuristic, type AgentSpec } from "./llm.js";
 import * as T from "./tools.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -86,21 +86,21 @@ function once<R>(key: string, fn: () => Promise<R>): Promise<R> {
 export function analyseTransaction(transactionId: string) {
   return once(`tx:${transactionId}`, async () => {
     if (aiOnline()) return runAgent(riskWatch, `Assess PayPal transaction ${transactionId} before it ships.`);
-    return heuristicRisk(transactionId);
+    return runHeuristic("rules-engine", `Assess ${transactionId}`, () => heuristicRisk(transactionId));
   });
 }
 
 export function analyseDispute(disputeId: string) {
   return once(`dispute:${disputeId}`, async () => {
     if (aiOnline()) return runAgent(disputeAgent, `Build the case for PayPal dispute ${disputeId} and recommend contest or accept.`);
-    return heuristicDispute(disputeId);
+    return runHeuristic("rules-engine", `Dispute ${disputeId}`, () => heuristicDispute(disputeId));
   });
 }
 
 export function analyseRing(ringId: string) {
   return once(`ring:${ringId}`, async () => {
     if (aiOnline()) return runAgent(ringHunter, `Investigate ${ringId} and decide whether it is a fraud ring.`);
-    return heuristicRing(ringId);
+    return runHeuristic("rules-engine", `Ring ${ringId}`, () => heuristicRing(ringId));
   });
 }
 

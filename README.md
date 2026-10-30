@@ -46,6 +46,13 @@ Connect any MCP client:
 
 Tools: `argus_get_mandate(agentId)`, `argus_pay(agentId, payee, amount, purpose, context?)`.
 
+### 📈 Observability and tamper-evident audit
+
+- **Hash-chained audit log** (`data/audit.jsonl`): every agent decision, tool call, approval and PayPal API call is appended with a SHA-256 hash that also covers the previous entry. **Verify chain** recomputes every link, so editing or deleting any past record is detected, along with exactly where. The log can be exported as JSONL.
+- **Run traces**: each agent run records its model, steps, input, output and cache tokens, cost in USD, latency, and a span per tool call.
+- **Metrics**: per-agent runs, average and p95 latency, errors and spend; per-endpoint PayPal call counts, latency and failures; and the split of money decisions made by policy versus by a human.
+- **Optional Elastic sink**: set `ELASTIC_URL` and `ELASTIC_API_KEY` and audit entries are bulk-indexed into Elastic (`argus-audit`) for search and dashboards.
+
 ### Guardrails: AI behind the wheel, human on the brake
 
 Every money-moving or customer-facing action goes through one policy engine (`server/src/actions.ts`). The merchant chooses how much autonomy the agents get:
@@ -130,6 +137,7 @@ A `render.yaml` blueprint is included: on Render, choose **New → Blueprint**, 
 ## Sponsor tools
 
 - **AG Grid** for the transaction risk grid.
+- **Elastic** (optional) as the audit log sink.
 - **Render** for hosting (blueprint included).
 
 ## License

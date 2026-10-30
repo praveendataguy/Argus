@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requestAction } from "./actions.js";
 import { client, defineTool, runAgent, type AgentSpec } from "./agents/llm.js";
 import { config } from "./config.js";
+import { endRun, recordUsage, startRun } from "./observability.js";
 import { newId, store } from "./store.js";
 
 /**
@@ -136,6 +137,8 @@ function offlineJudge(purpose: string, context: string) {
 /** A separate model judges intent, so a hijacked agent can't vouch for itself. */
 async function judge(m: Mandate, payee: string, amount: number, purpose: string, context: string) {
   if (!client) return offlineJudge(purpose, context);
+  const runId = newId("RUN");
+  startRun(runId, "intent-judge", `$${amount} to ${payee} for ${m.agentId}`);
   try {
     const res = await client.messages.parse({
       model: config.anthropic.model,
@@ -159,9 +162,15 @@ ${context.slice(0, 6000)}
         },
       ],
     });
-    if (res.stop_reason === "refusal" || !res.parsed_output) return { verdict: "hold" as const, injection: false, reason: "Judge could not assess this request." };
+    recordUsage(runId, res.usage);
+    if (res.stop_reason === "refusal" || !res.parsed_output) {
+      endRun(runId, "refused");
+      return { verdict: "hold" as const, injection: false, reason: "Judge could not assess this request." };
+    }
+    endRun(runId, "ok", `${res.parsed_output.verdict}: ${res.parsed_output.reason}`);
     return res.parsed_output;
   } catch (err) {
+    endRun(runId, "error", err instanceof Error ? err.message : String(err));
     store.log({ agent: "argus-firewall", kind: "error", message: `Intent judge failed: ${err instanceof Error ? err.message : err}` });
     return { verdict: "hold" as const, injection: false, reason: "Judge unavailable; holding for a human." };
   }

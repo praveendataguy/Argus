@@ -130,7 +130,7 @@ class Store extends EventEmitter {
     return event;
   }
 
-  changed(entity: "transactions" | "disputes" | "invoices" | "approvals" | "settings" | "wargame" | "firewall") {
+  changed(entity: "transactions" | "disputes" | "invoices" | "approvals" | "settings" | "wargame" | "firewall" | "observability") {
     this.emit("changed", entity);
   }
 

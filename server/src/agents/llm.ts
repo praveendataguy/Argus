@@ -3,6 +3,7 @@ import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { BetaRunnableTool } from "@anthropic-ai/sdk/lib/tools/BetaRunnableTool";
 import type { z } from "zod";
 import { config } from "../config.js";
+import { endRun, recordTool, recordUsage, startRun } from "../observability.js";
 import { newId, store } from "../store.js";
 
 export const client = config.anthropic.enabled ? new Anthropic() : null;
@@ -29,10 +30,13 @@ export function defineTool<S extends z.ZodObject>(spec: {
       inputSchema: spec.inputSchema,
       run: async (input) => {
         store.log({ agent: ctx.agent, kind: "tool", runId: ctx.runId, message: `→ ${spec.name}(${summarise(input)})` });
+        const t0 = Date.now();
         try {
           const result = await spec.run(input as z.infer<S>, ctx);
+          recordTool(ctx.runId, { name: spec.name, ms: Date.now() - t0, ok: true });
           return typeof result === "string" ? result : JSON.stringify(result, null, 1);
         } catch (err) {
+          recordTool(ctx.runId, { name: spec.name, ms: Date.now() - t0, ok: false });
           const message = err instanceof Error ? err.message : String(err);
           store.log({ agent: ctx.agent, kind: "error", runId: ctx.runId, message: `${spec.name} failed: ${message}` });
           return `ERROR: ${message}`;
@@ -47,6 +51,20 @@ function summarise(input: unknown) {
 }
 
 // Tools with different input types share one list.
+/** Traces an offline rules-engine run the same way as an AI run. */
+export async function runHeuristic<T extends { text: string }>(agent: string, task: string, fn: (runId: string) => Promise<T>): Promise<T & { runId: string }> {
+  const runId = newId("RUN");
+  startRun(runId, agent, task, "rules-engine");
+  try {
+    const out = await fn(runId);
+    endRun(runId, "ok", out.text);
+    return { ...out, runId };
+  } catch (err) {
+    endRun(runId, "error", err instanceof Error ? err.message : String(err));
+    throw err;
+  }
+}
+
 export type ToolFactory = (ctx: ToolContext) => BetaRunnableTool<any>;
 
 export interface AgentSpec {
@@ -62,6 +80,7 @@ export async function runAgent(spec: AgentSpec, task: string): Promise<{ runId: 
   const runId = newId("RUN");
   const ctx: ToolContext = { agent: spec.name, runId };
   store.log({ agent: spec.name, kind: "info", runId, message: `Started: ${task.split("\n")[0].slice(0, 160)}` });
+  startRun(runId, spec.name, task);
 
   const runner = client.beta.messages.toolRunner({
     model: config.anthropic.model,
@@ -77,17 +96,26 @@ export async function runAgent(spec: AgentSpec, task: string): Promise<{ runId: 
   });
 
   let text = "";
-  for await (const message of runner) {
-    if (message.stop_reason === "refusal") {
-      store.log({ agent: spec.name, kind: "error", runId, message: "The model declined this request." });
-      break;
+  let status: "ok" | "refused" = "ok";
+  try {
+    for await (const message of runner) {
+      recordUsage(runId, message.usage);
+      if (message.stop_reason === "refusal") {
+        store.log({ agent: spec.name, kind: "error", runId, message: "The model declined this request." });
+        status = "refused";
+        break;
+      }
+      for (const block of message.content) {
+        if (block.type === "thinking" && block.thinking.trim())
+          store.log({ agent: spec.name, kind: "thinking", runId, message: block.thinking.trim().slice(0, 600) });
+        if (block.type === "text" && block.text.trim()) text = block.text.trim();
+      }
     }
-    for (const block of message.content) {
-      if (block.type === "thinking" && block.thinking.trim())
-        store.log({ agent: spec.name, kind: "thinking", runId, message: block.thinking.trim().slice(0, 600) });
-      if (block.type === "text" && block.text.trim()) text = block.text.trim();
-    }
+  } catch (err) {
+    endRun(runId, "error", err instanceof Error ? err.message : String(err));
+    throw err;
   }
+  endRun(runId, status, text);
   if (text) store.log({ agent: spec.name, kind: "decision", runId, message: text.slice(0, 800) });
   return { runId, text };
 }

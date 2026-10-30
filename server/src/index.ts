@@ -8,6 +8,7 @@ import { buildGraph } from "./graph.js";
 import { agentPayments, mandates, payees, runLiveShopper, scenarios } from "./firewall.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./mcp.js";
+import { attachAudit, audit, snapshot } from "./observability.js";
 import { describeRule, learnedRules } from "./rules.js";
 import { CATCH_SCORE, game, playRound, resetGame, toggleRule } from "./wargame.js";
 import { catalog, merchant, productBySku } from "./catalog.js";
@@ -17,6 +18,7 @@ import { seedDemoData } from "./seed.js";
 import { simulateOrder, type Scenario } from "./simulate.js";
 import { newId, store, type Dispute, type LineItem, type Transaction } from "./store.js";
 
+attachAudit();
 seedDemoData();
 
 const app = express();
@@ -162,6 +164,16 @@ app.post("/mcp", wrap(async (req, res) => {
   await transport.handleRequest(req, res, req.body);
 }));
 app.all("/mcp", (_req, res) => res.status(405).json({ error: "Use POST for MCP requests" }));
+
+/* ---------------- Observability & audit ---------------- */
+
+app.get("/api/observability", (_req, res) => res.json(snapshot()));
+app.get("/api/audit", (req, res) => res.json(audit.tail(Math.min(500, Number(req.query.limit ?? 200)))));
+app.get("/api/audit/verify", (_req, res) => res.json(audit.verify()));
+app.get("/api/audit/export", (_req, res) => {
+  res.set({ "Content-Type": "application/x-ndjson", "Content-Disposition": "attachment; filename=argus-audit.jsonl" });
+  res.send(audit.file());
+});
 
 /* ---------------- War game ---------------- */
 
