@@ -1,0 +1,26 @@
+{
+  "name": "sentinel-pay",
+  "private": true,
+  "version": "0.1.0",
+  "description": "An autonomous AI back office that guards a PayPal merchant account: risk, disputes and billing agents with a human approval queue.",
+  "license": "MIT",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "concurrently -n server,web -c blue,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
+    "build": "npm run build -w web && npm run typecheck -w server",
+    "start": "npm run start -w server",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "overrides": {
+    "rollup": "4.66.0"
+  }
+}

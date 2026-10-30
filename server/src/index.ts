@@ -1,0 +1,223 @@
+import express, { type NextFunction, type Request, type Response } from "express";
+import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { executeApproval, rejectApproval } from "./actions.js";
+import { aiOnline, analyseDispute, analyseTransaction, askCopilot, draftInvoices } from "./agents/index.js";
+import { catalog, merchant, productBySku } from "./catalog.js";
+import { config, paypalMode } from "./config.js";
+import { paypal } from "./paypal/index.js";
+import { seedDemoData } from "./seed.js";
+import { simulateOrder, type Scenario } from "./simulate.js";
+import { newId, store, type Dispute, type LineItem, type Transaction } from "./store.js";
+
+seedDemoData();
+
+const app = express();
+app.use(express.json({ limit: "1mb" }));
+
+const wrap = (fn: (req: Request, res: Response) => Promise<unknown>) => (req: Request, res: Response, next: NextFunction) =>
+  fn(req, res).catch(next);
+
+/** Runs agent work after the HTTP response; progress reaches the UI over SSE. */
+const background = (label: string, p: Promise<unknown>) =>
+  p.catch((err) => store.log({ agent: "system", kind: "error", message: `${label}: ${err instanceof Error ? err.message : err}` }));
+
+app.get("/api/config", (_req, res) => {
+  res.json({
+    merchant,
+    catalog,
+    paypalMode,
+    paypalClientId: paypalMode === "sandbox" ? config.paypal.clientId : null,
+    aiOnline: aiOnline(),
+    model: config.anthropic.model,
+    autonomy: store.autonomy,
+    autoApproveLimit: config.policy.autoApproveLimit,
+  });
+});
+
+app.get("/api/state", (_req, res) => {
+  res.json({
+    transactions: [...store.transactions.values()].reverse(),
+    disputes: [...store.disputes.values()],
+    invoices: [...store.invoices.values()].reverse(),
+    approvals: [...store.approvals.values()].reverse(),
+    events: store.events.slice(-200),
+    autonomy: store.autonomy,
+  });
+});
+
+app.get("/api/stream", (req, res) => {
+  res.set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive", "X-Accel-Buffering": "no" });
+  res.flushHeaders();
+  const send = (type: string, data: unknown) => res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+  const onEvent = (e: unknown) => send("agent", e);
+  const onChange = (entity: string) => send("changed", { entity });
+  store.on("event", onEvent);
+  store.on("changed", onChange);
+  const ping = setInterval(() => res.write(": ping\n\n"), 20_000);
+  req.on("close", () => {
+    clearInterval(ping);
+    store.off("event", onEvent);
+    store.off("changed", onChange);
+  });
+});
+
+app.post("/api/settings", (req, res) => {
+  const autonomy = req.body?.autonomy;
+  if (!["observe", "guarded", "autopilot"].includes(autonomy)) return res.status(400).json({ error: "Invalid autonomy" });
+  store.autonomy = autonomy;
+  store.changed("settings");
+  store.log({ agent: "human", kind: "info", message: `Autonomy set to ${autonomy}.` });
+  res.json({ autonomy });
+});
+
+app.post("/api/transactions/:id/analyse", (req, res) => {
+  background("Risk analysis", analyseTransaction(req.params.id));
+  res.status(202).json({ ok: true });
+});
+
+app.post("/api/transactions/analyse-unscored", (_req, res) => {
+  const ids = [...store.transactions.values()].filter((t) => !t.risk).map((t) => t.id);
+  // Sequential so the feed reads like an analyst working through a queue.
+  background("Risk sweep", ids.reduce((p, id) => p.then(() => analyseTransaction(id)), Promise.resolve<unknown>(null)));
+  res.status(202).json({ queued: ids });
+});
+
+app.post("/api/disputes/:id/analyse", (req, res) => {
+  background("Dispute analysis", analyseDispute(req.params.id));
+  res.status(202).json({ ok: true });
+});
+
+app.post("/api/disputes/sync", wrap(async (_req, res) => {
+  const remote = await paypal.listDisputes();
+  for (const r of remote) {
+    if (store.disputes.has(r.id)) continue;
+    const tx = [...store.transactions.values()].find((t) => t.captureId === r.captureId);
+    store.upsertDispute({
+      id: r.id,
+      transactionId: tx?.id ?? "",
+      createdAt: r.createdAt,
+      reason: r.reason as Dispute["reason"],
+      amount: r.amount,
+      currency: r.currency,
+      status: "WAITING_FOR_SELLER_RESPONSE",
+      buyerMessage: r.buyerMessage ?? "",
+      source: "paypal-sandbox",
+    });
+  }
+  res.json({ synced: remote.length });
+}));
+
+app.post("/api/approvals/:id/approve", wrap(async (req, res) => res.json(await executeApproval(String(req.params.id)))));
+app.post("/api/approvals/:id/reject", wrap(async (req, res) => res.json(await rejectApproval(String(req.params.id)))));
+
+app.post("/api/invoices/draft", wrap(async (req, res) => {
+  const text = String(req.body?.text ?? "").trim();
+  if (!text) return res.status(400).json({ error: "Describe the invoice" });
+  res.json(await draftInvoices(text));
+}));
+
+app.post("/api/copilot", wrap(async (req, res) => {
+  const question = String(req.body?.question ?? "").trim();
+  if (!question) return res.status(400).json({ error: "Ask a question" });
+  res.json(await askCopilot(question));
+}));
+
+/* ---------------- Storefront checkout (PayPal Orders v2) ---------------- */
+
+function cartToItems(cart: { sku: string; quantity: number }[]): LineItem[] {
+  return cart.map(({ sku, quantity }) => {
+    const p = productBySku(sku);
+    if (!p) throw new Error(`Unknown product ${sku}`);
+    return { name: p.name, quantity: Math.max(1, Math.min(10, Number(quantity) || 1)), unitAmount: p.price };
+  });
+}
+
+app.post("/api/checkout/orders", wrap(async (req, res) => {
+  const items = cartToItems(req.body?.cart ?? []);
+  if (!items.length) return res.status(400).json({ error: "Cart is empty" });
+  const amount = items.reduce((s, i) => s + i.quantity * i.unitAmount, 0);
+  const order = await paypal.createOrder({ amount, currency: config.policy.currency, items, description: `${merchant.name} order` });
+  pendingCarts.set(order.id, items);
+  res.json(order);
+}));
+
+const pendingCarts = new Map<string, LineItem[]>();
+
+app.post("/api/checkout/orders/:id/capture", wrap(async (req, res) => {
+  const capture = await paypal.captureOrder(String(req.params.id));
+  const items = pendingCarts.get(capture.orderId) ?? [{ name: "PayPal order", quantity: 1, unitAmount: capture.amount }];
+  pendingCarts.delete(capture.orderId);
+  const country = capture.payer.country ?? "US";
+  const tx: Transaction = {
+    id: newId("TX"),
+    orderId: capture.orderId,
+    captureId: capture.captureId,
+    createdAt: new Date().toISOString(),
+    amount: capture.amount,
+    currency: capture.currency,
+    items,
+    buyer: { name: capture.payer.name, email: capture.payer.email, country, accountAgeDays: 400, payerId: capture.payer.payerId },
+    shipping: { country: capture.shipping?.country ?? country, city: capture.shipping?.city ?? "", method: capture.amount > 300 ? "tracked-signature" : "tracked" },
+    ipCountry: country,
+    device: String(req.headers["user-agent"] ?? "Unknown").slice(0, 60),
+    status: "COMPLETED",
+    refundedAmount: 0,
+    source: paypalMode === "sandbox" ? "paypal-sandbox" : "simulator",
+  };
+  store.upsertTransaction(tx);
+  store.log({ agent: "paypal", kind: "webhook", message: `Payment captured: ${tx.id} · $${tx.amount.toFixed(2)} from ${tx.buyer.email} (capture ${tx.captureId})` });
+  background("Risk analysis", analyseTransaction(tx.id));
+  res.json({ transactionId: tx.id, captureId: tx.captureId, status: capture.status });
+}));
+
+app.post("/api/simulate/:scenario", wrap(async (req, res) => {
+  const tx = await simulateOrder(req.params.scenario as Scenario);
+  background("Risk analysis", analyseTransaction(tx.id));
+  res.json({ transactionId: tx.id });
+}));
+
+/* ---------------- PayPal webhooks ---------------- */
+
+app.post("/api/webhooks/paypal", wrap(async (req, res) => {
+  const event = req.body as { event_type?: string; resource?: { id?: string; dispute_id?: string } };
+  const verified = await paypal.verifyWebhook(req.headers, event).catch(() => false);
+  store.log({ agent: "paypal", kind: "webhook", message: `Webhook ${event.event_type ?? "?"} (${verified ? "signature verified" : "unverified"})` });
+  if (!verified && paypalMode === "sandbox") return res.status(400).json({ error: "Signature verification failed" });
+
+  if (event.event_type === "CUSTOMER.DISPUTE.CREATED" && event.resource?.dispute_id) {
+    const remote = await paypal.listDisputes();
+    const r = remote.find((d) => d.id === event.resource!.dispute_id);
+    if (r && !store.disputes.has(r.id)) {
+      const tx = [...store.transactions.values()].find((t) => t.captureId === r.captureId);
+      store.upsertDispute({ id: r.id, transactionId: tx?.id ?? "", createdAt: r.createdAt, reason: r.reason as Dispute["reason"], amount: r.amount, currency: r.currency, status: "WAITING_FOR_SELLER_RESPONSE", buyerMessage: "", source: "paypal-sandbox" });
+      background("Dispute analysis", analyseDispute(r.id));
+    }
+  }
+  if (event.event_type === "PAYMENT.CAPTURE.COMPLETED" && event.resource?.id) {
+    const tx = [...store.transactions.values()].find((t) => t.captureId === event.resource!.id);
+    if (tx && !tx.risk) background("Risk analysis", analyseTransaction(tx.id));
+  }
+  res.json({ ok: true });
+}));
+
+/* ---------------- Static web app ---------------- */
+
+const webDist = join(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
+if (existsSync(webDist)) {
+  app.use(express.static(webDist));
+  app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(join(webDist, "index.html")));
+}
+
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const message = err instanceof Error ? err.message : String(err);
+  store.log({ agent: "system", kind: "error", message });
+  res.status(500).json({ error: message });
+});
+
+app.listen(config.port, () => {
+  console.log(`Sentinel Pay on http://localhost:${config.port}`);
+  console.log(`  PayPal: ${paypalMode}${paypalMode === "simulator" ? " (set PAYPAL_CLIENT_ID/SECRET for the real sandbox)" : ""}`);
+  console.log(`  AI: ${aiOnline() ? config.anthropic.model : "offline rules engine (set ANTHROPIC_API_KEY)"}`);
+});
