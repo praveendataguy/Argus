@@ -53,6 +53,13 @@ export interface Dispute {
     at: string;
   };
   source: string;
+  tribunal?: {
+    status: "sitting" | "ruled";
+    by: "ai" | "rules-engine";
+    at: string;
+    transcript: { role: "prosecutor" | "defender" | "judge"; stage: string; text: string; points?: string[] }[];
+    ruling?: { decision: "contest" | "accept"; confidence: number; winProbability: number; reasoning: string; decisiveFactors: string[]; misstatements: string[]; dissent: string };
+  };
 }
 
 export interface Invoice {
@@ -82,6 +89,7 @@ export interface Approval {
   status: "PENDING" | "APPROVED" | "REJECTED" | "EXECUTED" | "FAILED";
   autoApproved?: boolean;
   result?: string;
+  stepUp?: string;
 }
 
 export interface AgentEvent {

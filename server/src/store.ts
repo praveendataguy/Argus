@@ -66,6 +66,29 @@ export interface Dispute {
     at: string;
   };
   source: "seed" | "paypal-sandbox";
+  tribunal?: {
+    status: "sitting" | "ruled";
+    by: "ai" | "rules-engine";
+    transcript: TribunalTurn[];
+    at: string;
+    ruling?: {
+      decision: "contest" | "accept";
+      confidence: number;
+      winProbability: number;
+      reasoning: string;
+      decisiveFactors: string[];
+      misstatements: string[];
+      dissent: string;
+      responseText: string;
+    };
+  };
+}
+
+export interface TribunalTurn {
+  role: "prosecutor" | "defender" | "judge";
+  stage: "opening" | "rebuttal" | "ruling";
+  text: string;
+  points?: string[];
 }
 
 export interface Invoice {
@@ -100,6 +123,8 @@ export interface Approval {
   autoApproved?: boolean;
   result?: string;
   decidedAt?: string;
+  /** Passkey credential that signed this approval (step-up for high-value actions). */
+  stepUp?: string;
 }
 
 export interface AgentEvent {

@@ -3,6 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
+import { signToken } from "./credentials.js";
 import { store, type AgentEvent } from "./store.js";
 
 /* ================================ audit log ================================ */
@@ -35,6 +36,8 @@ const digest = (e: Omit<AuditEntry, "hash">) =>
 class AuditLog {
   private head = { seq: 0, hash: GENESIS };
   private recent: AuditEntry[] = [];
+  /** Every entry hash in order: the leaves of the Merkle tree. */
+  readonly hashes: string[] = [];
 
   constructor() {
     mkdirSync(dirname(AUDIT_FILE), { recursive: true });
@@ -46,6 +49,7 @@ class AuditLog {
         this.head = { seq: e.seq, hash: e.hash };
       }
       this.recent = lines.slice(-500).map((l) => JSON.parse(l));
+      for (const l of lines) this.hashes.push((JSON.parse(l) as AuditEntry).hash);
     }
   }
 
@@ -55,8 +59,11 @@ class AuditLog {
     appendFileSync(AUDIT_FILE, JSON.stringify(entry) + "\n");
     this.head = { seq: entry.seq, hash: entry.hash };
     this.recent.push(entry);
+    this.hashes.push(entry.hash);
     if (this.recent.length > 500) this.recent.shift();
     elastic.push(entry);
+    // Publish a signed checkpoint every 100 entries.
+    if (entry.seq % 100 === 0 && type !== "audit.checkpoint") setImmediate(() => checkpoint());
     return entry;
   }
 
@@ -125,6 +132,62 @@ const elastic = {
 };
 
 export const audit = new AuditLog();
+
+/* ====================== signed Merkle checkpoints (RFC 6962) ====================== */
+
+/**
+ * Transparency-log style proofs on top of the hash chain. A checkpoint is the
+ * Merkle root over the first N entries, signed by Argus (Ed25519). Anyone
+ * holding a checkpoint can check that a single entry is included with a
+ * log2(N) proof, without downloading the whole log.
+ */
+export interface Checkpoint {
+  treeSize: number;
+  rootHash: string;
+  at: string;
+  token: string;
+}
+
+const leaf = (h: string) => createHash("sha256").update(Buffer.concat([Buffer.from([0]), Buffer.from(h, "hex")])).digest();
+const node = (l: Buffer, r: Buffer) => createHash("sha256").update(Buffer.concat([Buffer.from([1]), l, r])).digest();
+const split = (n: number) => 2 ** Math.floor(Math.log2(n - 1));
+
+function mth(leaves: Buffer[]): Buffer {
+  if (leaves.length === 1) return leaves[0];
+  const k = split(leaves.length);
+  return node(mth(leaves.slice(0, k)), mth(leaves.slice(k)));
+}
+
+function auditPath(m: number, leaves: Buffer[]): { side: "L" | "R"; hash: string }[] {
+  if (leaves.length === 1) return [];
+  const k = split(leaves.length);
+  return m < k
+    ? [...auditPath(m, leaves.slice(0, k)), { side: "R", hash: mth(leaves.slice(k)).toString("hex") }]
+    : [...auditPath(m - k, leaves.slice(k)), { side: "L", hash: mth(leaves.slice(0, k)).toString("hex") }];
+}
+
+export const checkpoints: Checkpoint[] = [];
+
+export function checkpoint(): Checkpoint | undefined {
+  const n = audit.hashes.length;
+  if (!n || checkpoints[0]?.treeSize === n) return checkpoints[0];
+  const rootHash = mth(audit.hashes.map(leaf)).toString("hex");
+  const at = new Date().toISOString();
+  const token = signToken("argus", { type: "AuditCheckpoint", log: "argus-audit", treeSize: n, rootHash, iat: Math.floor(Date.now() / 1000) });
+  const cp = { treeSize: n, rootHash, at, token };
+  checkpoints.unshift(cp);
+  if (checkpoints.length > 50) checkpoints.pop();
+  audit.append("audit.checkpoint", "argus", `Signed checkpoint: ${n} entries, root ${rootHash.slice(0, 16)}…`, { data: { treeSize: n, rootHash, token } });
+  return cp;
+}
+
+/** Inclusion proof for one entry against the newest checkpoint that covers it. */
+export function inclusionProof(seq: number) {
+  if (seq < 1 || seq > audit.hashes.length) throw new Error(`No audit entry #${seq}`);
+  const cp = checkpoints.find((c) => c.treeSize >= seq) ?? checkpoint()!;
+  const leaves = audit.hashes.slice(0, cp.treeSize).map(leaf);
+  return { seq, entryHash: audit.hashes[seq - 1], leafIndex: seq - 1, treeSize: cp.treeSize, path: auditPath(seq - 1, leaves), rootHash: cp.rootHash, checkpoint: cp };
+}
 
 /* ================================ run traces ================================= */
 
@@ -305,7 +368,7 @@ export function snapshot() {
     perAgent,
     paypal,
     runs: runs.slice(0, 60),
-    audit: { ...audit.headInfo, elastic: elastic.enabled ? elastic.index : null },
+    audit: { ...audit.headInfo, elastic: elastic.enabled ? elastic.index : null, checkpoint: checkpoints[0] ?? null },
   };
 }
 

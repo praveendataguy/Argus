@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ago, api, usd } from "../api";
+import { approve, type PasskeyStatus } from "../security";
 import type { AgentEvent, AppConfig, AppState, Approval } from "../types";
 
 export function CommandCenter({ config, state }: { config: AppConfig; state: AppState }) {
@@ -12,6 +13,10 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
   const pending = state.approvals.filter((a) => a.status === "PENDING");
   const recent = state.approvals.filter((a) => a.status !== "PENDING").slice(0, 6);
   const unscored = txs.filter((t) => !t.risk).length;
+  const [passkeys, setPasskeys] = useState<PasskeyStatus | null>(null);
+  useEffect(() => {
+    api<PasskeyStatus>("/passkey").then(setPasskeys).catch(() => undefined);
+  }, [state.approvals.length]);
 
   return (
     <div className="cc">
@@ -39,7 +44,7 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
           <h2>Approval queue</h2>
           {pending.length === 0 && <p className="empty">Nothing needs you right now. Agents are within policy.</p>}
           {pending.map((a) => (
-            <ApprovalCard key={a.id} a={a} />
+            <ApprovalCard key={a.id} a={a} stepUpAbove={passkeys?.enrolled.length ? passkeys.stepUpAbove : undefined} />
           ))}
           {recent.length > 0 && <h3>Recently decided</h3>}
           {recent.map((a) => (
@@ -47,7 +52,7 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
               <span>{a.autoApproved ? "⚙️" : a.status === "REJECTED" ? "✋" : a.status === "FAILED" ? "⚠️" : "✅"}</span>
               <div>
                 <div>{a.title}</div>
-                <small>{a.result ?? a.status.toLowerCase()} · {a.autoApproved ? "auto by policy" : "by you"}</small>
+                <small>{a.result ?? a.status.toLowerCase()} · {a.autoApproved ? "auto by policy" : a.stepUp ? `by you · 🔑 passkey ${a.stepUp}` : "by you"}</small>
               </div>
             </div>
           ))}
@@ -85,16 +90,21 @@ const KIND_LABEL: Record<string, string> = {
   AGENT_PAYMENT: "Agent payment",
 };
 
-function ApprovalCard({ a }: { a: Approval }) {
+function ApprovalCard({ a, stepUpAbove }: { a: Approval; stepUpAbove?: number }) {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const act = async (verb: "approve" | "reject") => {
     setBusy(true);
+    setError(null);
     try {
-      await api(`/approvals/${a.id}/${verb}`, {});
+      await (verb === "approve" ? approve(a.id) : api(`/approvals/${a.id}/reject`, {}));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
   };
+  const stepUp = stepUpAbove !== undefined && a.amount > stepUpAbove;
   return (
     <div className="approval">
       <div className="approval-head">
@@ -105,12 +115,14 @@ function ApprovalCard({ a }: { a: Approval }) {
       <p className="approval-why">{a.rationale}</p>
       <div className="approval-actions">
         <button className="primary" disabled={busy} onClick={() => act("approve")}>
-          Approve{["REFUND", "PAYOUT", "DISPUTE_ACCEPT", "AGENT_PAYMENT"].includes(a.kind) ? " & move money" : ""}
+          {stepUp ? "🔑 " : ""}Approve{["REFUND", "PAYOUT", "DISPUTE_ACCEPT", "AGENT_PAYMENT"].includes(a.kind) ? " & move money" : ""}
         </button>
         <button disabled={busy} onClick={() => act("reject")}>
           Reject
         </button>
       </div>
+      {stepUp && <div className="small muted">Above {usd(stepUpAbove!)}: you'll sign this exact approval with your passkey.</div>}
+      {error && <div className="small bad">{error}</div>}
     </div>
   );
 }
@@ -130,6 +142,12 @@ const AGENT_ICON: Record<string, string> = {
   paypal: "🅿️",
   human: "🧑",
   system: "•",
+  "merchant-counsel": "👔",
+  "buyer-advocate": "🙋",
+  "chief-judge": "👩‍⚖️",
+  "ml-model": "📈",
+  "intent-judge": "🔍",
+  voice: "🎙️",
 };
 
 function Feed({ events }: { events: AgentEvent[] }) {

@@ -4,6 +4,7 @@ import { defineTool, runAgent, type AgentSpec } from "./agents/llm.js";
 import { catalog, merchant, productBySku } from "./catalog.js";
 import { computeSignals, heuristicScore } from "./risk.js";
 import { describeRule, features, FEATURES, learnedRules, matches, type Condition, type Feature, type LearnedRule } from "./rules.js";
+import { ensure as ensureModel, modelVersion, resetModel, scoreTx, train } from "./ml.js";
 import { fingerprintFor } from "./seed.js";
 import { newId, store, type Transaction } from "./store.js";
 
@@ -39,6 +40,8 @@ export interface Round {
   newRules: string[];
   caughtAfterLearning: number;
   blueSummary: string;
+  /** The ML model's out-of-sample score on this wave, before it retrains on it. */
+  ml?: { version: number; caught: number; falsePositives: number; caughtAfterRetrain?: number; version2?: number };
 }
 
 export const game = { rounds: [] as Round[], running: false, orders: [] as Transaction[] };
@@ -354,6 +357,7 @@ export async function playRound(): Promise<Round> {
       specs = Array.from({ length: 5 }, (_, i) => s.make(i));
     }
 
+    ensureModel(); // fit on past data before this wave exists, so its score is out-of-sample
     const attacks = specs.map((s, i) => toTx(s, n, i, true));
     const benign = Array.from({ length: 4 }, (_, i) => toTx(benignSpec(n * 10 + i), n, i, false));
     game.orders.push(...attacks, ...benign);
@@ -381,7 +385,14 @@ export async function playRound(): Promise<Round> {
       caughtAfterLearning: caught,
       blueSummary: "",
     };
+    const mlVersion = modelVersion();
+    round.ml = {
+      version: mlVersion,
+      caught: attacks.filter((t) => scoreTx(t) >= 0.5).length,
+      falsePositives: benign.filter((t) => scoreTx(t) >= 0.5).length,
+    };
     game.rounds.push(round);
+    store.log({ agent: "ml-model", kind: "info", message: `Round ${n}: model v${mlVersion} flagged ${round.ml.caught}/${attacks.length} attacks it had never seen, ${round.ml.falsePositives} false positive(s).` });
     store.log({ agent: "red-team", kind: "decision", message: `Wave ${n} "${tactic}": ${rationale}` });
     store.log({ agent: "policy-engine", kind: "info", message: `Round ${n}: Argus caught ${caught}/${attacks.length} attacks, ${round.falsePositives} false positive(s).` });
     store.changed("wargame");
@@ -399,6 +410,9 @@ export async function playRound(): Promise<Round> {
 
     for (const r of learnedRules) r.hits = game.orders.filter((t) => t.id.includes("-A") && matches(r, t)).length;
     round.caughtAfterLearning = orders.filter((o) => o.attacker && score(o.tx).caught).length;
+    const v = train(`Retrained on round ${n}'s labelled wave.`);
+    round.ml.version2 = v.version;
+    round.ml.caughtAfterRetrain = attacks.filter((t) => scoreTx(t) >= 0.5).length;
     store.log({ agent: "blue-team", kind: "decision", message: `Round ${n}: ${round.blueSummary} Re-scored this wave: ${round.caughtAfterLearning}/${round.attacks} now caught.` });
     store.changed("wargame");
     return round;
@@ -411,6 +425,7 @@ export function resetGame() {
   game.rounds = [];
   game.orders = [];
   learnedRules.splice(0);
+  resetModel();
   store.changed("wargame");
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { api } from "../api";
 import type { AppState } from "../types";
 
@@ -27,6 +27,19 @@ interface Round {
   newRules: string[];
   caughtAfterLearning: number;
   blueSummary: string;
+  ml?: { version: number; caught: number; falsePositives: number; caughtAfterRetrain?: number; version2?: number };
+}
+
+interface ModelState {
+  current: {
+    version: number;
+    samples: number;
+    positives: number;
+    trainedAt: string;
+    holdout: { auc: number | null; precision: number; recall: number; f1: number };
+    weights: { feature: string; label: string; weight: number }[];
+  };
+  history: { version: number; samples: number; positives: number; reason: string; holdout: { auc: number | null; recall: number } }[];
 }
 
 interface Rule {
@@ -56,7 +69,11 @@ const AFTER = "#5b8def";
 export function WarGame({ state }: { state: AppState }) {
   const [game, setGame] = useState<Game | null>(null);
   const [autoLeft, setAutoLeft] = useState(0);
-  const version = state.events.filter((e) => e.agent === "red-team" || e.agent === "blue-team").length;
+  const version = state.events.filter((e) => e.agent === "red-team" || e.agent === "blue-team" || e.agent === "ml-model").length;
+  const [model, setModel] = useState<ModelState | null>(null);
+  useEffect(() => {
+    api<ModelState>("/ml").then(setModel);
+  }, [version]);
 
   useEffect(() => {
     api<Game>("/wargame").then(setGame);
@@ -101,7 +118,7 @@ export function WarGame({ state }: { state: AppState }) {
 
       <section className="kpis">
         <div className="kpi"><div className="kpi-label">Rounds</div><div className="kpi-value">{game.rounds.length}</div><div className="kpi-sub">{attacks} synthetic attacks</div></div>
-        <div className="kpi"><div className="kpi-label">Caught on first contact</div><div className="kpi-value">{attacks ? Math.round((firstContact / attacks) * 100) : 0}%</div><div className="kpi-sub">{firstContact} of {attacks}</div></div>
+        <div className="kpi"><div className="kpi-label">Caught on first contact</div><div className="kpi-value">{attacks ? Math.round((firstContact / attacks) * 100) : 0}%</div><div className="kpi-sub">{firstContact} of {attacks} by rules · ML model {game.rounds.reduce((s, r) => s + (r.ml?.caught ?? 0), 0)} of {attacks} unseen</div></div>
         <div className="kpi kpi-green"><div className="kpi-label">Rules learned</div><div className="kpi-value">{game.rules.length}</div><div className="kpi-sub">each backtested on real orders</div></div>
         <div className={`kpi ${fp ? "kpi-red" : ""}`}><div className="kpi-label">Honest customers blocked</div><div className="kpi-value">{fp}</div><div className="kpi-sub">of {benign} legit orders mixed in</div></div>
       </section>
@@ -140,6 +157,7 @@ export function WarGame({ state }: { state: AppState }) {
               {r.author === "ai" && <p className="small">{r.rationale}</p>}
             </div>
           ))}
+          {model && <ModelPanel m={model} />}
         </section>
       </div>
     </div>
@@ -224,9 +242,56 @@ function RoundCard({ r }: { r: Round }) {
           </span>
         ))}
       </div>
+      {r.ml && (
+        <p className="small">
+          📈 ML model v{r.ml.version}, never trained on this wave: flagged <b>{r.ml.caught}/{r.attacks}</b>, {r.ml.falsePositives} false positive(s).
+          {r.ml.version2 && <span className="muted"> Retrained as v{r.ml.version2}.</span>}
+        </p>
+      )}
       <p className="small">🛡️ {r.blueSummary || "Blue team is studying the misses…"}</p>
       {r.newRules.length > 0 && <p className="small muted">New rules: {r.newRules.join(" · ")}</p>}
     </article>
   );
 }
 
+
+function ModelPanel({ m }: { m: ModelState }) {
+  const c = m.current;
+  const max = Math.max(0.01, ...c.weights.map((w) => Math.abs(w.weight)));
+  const ws = [...c.weights].sort((a, b) => b.weight - a.weight);
+  return (
+    <>
+      <h2 className="mt">📈 Explainable ML model</h2>
+      <p className="small muted">
+        Logistic regression on {c.samples} labelled orders ({c.positives} fraud), retrained after every round on the wave it just saw. Linear, so every
+        score splits exactly into per-feature contributions.
+      </p>
+      <div className="cp">
+        <div><span className="muted small">Version</span> <b>v{c.version}</b></div>
+        <div><span className="muted small">Holdout AUC</span> <b>{c.holdout.auc === null ? "n/a" : c.holdout.auc.toFixed(3)}</b></div>
+        <div><span className="muted small">Precision</span> <b>{Math.round(c.holdout.precision * 100)}%</b></div>
+        <div><span className="muted small">Recall</span> <b>{Math.round(c.holdout.recall * 100)}%</b></div>
+      </div>
+      <div className="legend">
+        <span><i style={{ background: BEFORE }} /> pushes toward fraud</span>
+        <span><i style={{ background: AFTER }} /> pushes toward legit</span>
+      </div>
+      <div className="mlbars">
+        {ws.map((w) => (
+          <Fragment key={w.feature}>
+            <span>{w.label}</span>
+            <span className="mlbar" title={`${w.label}: ${w.weight.toFixed(3)} log-odds per std. dev.`}>
+              <span className={w.weight >= 0 ? "pos" : "neg"} style={{ width: `${(Math.abs(w.weight) / max) * 50}%` }} />
+            </span>
+            <span className="mono">{w.weight >= 0 ? "+" : ""}{w.weight.toFixed(2)}</span>
+          </Fragment>
+        ))}
+      </div>
+      {m.history.length > 1 && (
+        <p className="small muted">
+          History: {[...m.history].reverse().map((h) => `v${h.version} (${h.samples} samples)`).join(" → ")}
+        </p>
+      )}
+    </>
+  );
+}

@@ -5,11 +5,15 @@ import { fileURLToPath } from "node:url";
 import { executeApproval, rejectApproval } from "./actions.js";
 import { aiOnline, analyseDispute, analyseRing, analyseTransaction, askCopilot, draftInvoices } from "./agents/index.js";
 import { buildGraph } from "./graph.js";
-import { agentPayments, mandates, payees, runLiveShopper, scenarios } from "./firewall.js";
+import { agentPayments, mandates, mandateTokens, payees, runLiveShopper, scenarios } from "./firewall.js";
+import { jwks, keyIds, verifyToken } from "./credentials.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./mcp.js";
-import { attachAudit, audit, snapshot } from "./observability.js";
+import { needsStepUp, passkeyStatus, registrationOptions, removePasskeys, stepUpOptions, verifyRegistration, verifyStepUp } from "./passkey.js";
+import { attachAudit, audit, checkpoint, inclusionProof, snapshot } from "./observability.js";
 import { describeRule, learnedRules } from "./rules.js";
+import { explain, modelState, train } from "./ml.js";
+import { conveneTribunal } from "./tribunal.js";
 import { CATCH_SCORE, game, playRound, resetGame, toggleRule } from "./wargame.js";
 import { catalog, merchant, productBySku } from "./catalog.js";
 import { config, paypalMode } from "./config.js";
@@ -97,6 +101,12 @@ app.post("/api/disputes/:id/analyse", (req, res) => {
   res.status(202).json({ ok: true });
 });
 
+app.post("/api/disputes/:id/tribunal", (req, res) => {
+  const id = String(req.params.id);
+  if (!store.disputes.has(id)) return res.status(404).json({ error: "No such dispute" });
+  background("Tribunal", conveneTribunal(id));
+  res.status(202).json({ started: true });
+});
 app.post("/api/disputes/sync", wrap(async (_req, res) => {
   const remote = await paypal.listDisputes();
   for (const r of remote) {
@@ -132,7 +142,8 @@ app.post("/api/rings/:id/analyse", (req, res) => {
 
 app.get("/api/firewall", (_req, res) => {
   res.json({
-    mandates,
+    mandates: mandates.map((m) => ({ ...m, token: mandateTokens.get(m.agentId) })),
+    keys: keyIds(),
     payees,
     payments: agentPayments.slice(0, 50),
     scenarios: Object.entries(scenarios).map(([id, s]) => ({ id, label: s.label })),
@@ -152,6 +163,9 @@ app.post("/api/firewall/live-agent", (_req, res) => {
   res.status(202).json({ ok: true });
 });
 
+app.get("/.well-known/jwks.json", (_req, res) => res.json(jwks()));
+app.post("/api/credentials/verify", (req, res) => res.json(verifyToken(String(req.body?.token ?? ""))));
+
 // MCP endpoint (stateless Streamable HTTP): a fresh server per request.
 app.post("/mcp", wrap(async (req, res) => {
   const server = createMcpServer();
@@ -169,7 +183,19 @@ app.all("/mcp", (_req, res) => res.status(405).json({ error: "Use POST for MCP r
 
 app.get("/api/observability", (_req, res) => res.json(snapshot()));
 app.get("/api/audit", (req, res) => res.json(audit.tail(Math.min(500, Number(req.query.limit ?? 200)))));
+/* ---------------- Explainable ML risk model ---------------- */
+app.get("/api/ml", (_req, res) => res.json(modelState()));
+app.post("/api/ml/train", (_req, res) => res.json(train("Manual retrain.")));
+app.get("/api/ml/explain/:id", (req, res) => {
+  const id = String(req.params.id);
+  const tx = store.transactions.get(id) ?? game.orders.find((t) => t.id === id);
+  if (!tx) return res.status(404).json({ error: "No such transaction" });
+  res.json(explain(tx));
+});
+
 app.get("/api/audit/verify", (_req, res) => res.json(audit.verify()));
+app.post("/api/audit/checkpoint", (_req, res) => res.json(checkpoint() ?? null));
+app.get("/api/audit/proof/:seq", (req, res) => res.json(inclusionProof(Number(req.params.seq))));
 app.get("/api/audit/export", (_req, res) => {
   res.set({ "Content-Type": "application/x-ndjson", "Content-Disposition": "attachment; filename=argus-audit.jsonl" });
   res.send(audit.file());
@@ -199,7 +225,34 @@ app.post("/api/wargame/reset", (_req, res) => {
 
 app.post("/api/wargame/rules/:id", wrap(async (req, res) => res.json(toggleRule(String(req.params.id), Boolean(req.body?.enabled)))));
 
-app.post("/api/approvals/:id/approve", wrap(async (req, res) => res.json(await executeApproval(String(req.params.id)))));
+/** Relying party for WebAuthn: the page's own origin (or PASSKEY_RP_ID when pinned in production). */
+const rp = (req: Request) => {
+  const origin = String(req.get("origin") ?? `${req.protocol}://${req.get("host")}`);
+  return { origin, rpID: process.env.PASSKEY_RP_ID ?? new URL(origin).hostname };
+};
+
+app.post("/api/approvals/:id/approve", wrap(async (req, res) => {
+  const a = store.approvals.get(String(req.params.id));
+  if (!a) return res.status(404).json({ error: "No such approval" });
+  const { rpID, origin } = rp(req);
+  if (a.status === "PENDING" && needsStepUp(a, rpID)) {
+    // High-value: the operator must sign this exact approval with their passkey.
+    if (!req.body?.assertion) return res.status(401).json({ stepUp: true, options: await stepUpOptions(a, rpID) });
+    a.stepUp = await verifyStepUp(a, rpID, origin, req.body.assertion);
+  }
+  res.json(await executeApproval(a.id));
+}));
+
+app.get("/api/passkey", (req, res) => res.json(passkeyStatus(rp(req).rpID)));
+app.post("/api/passkey/register/options", wrap(async (req, res) => res.json(await registrationOptions(rp(req).rpID))));
+app.post("/api/passkey/register/verify", wrap(async (req, res) => {
+  const { rpID, origin } = rp(req);
+  res.json(await verifyRegistration(rpID, origin, req.body.response, String(req.body.label ?? "Passkey").slice(0, 40)));
+}));
+app.delete("/api/passkey", (req, res) => {
+  removePasskeys(rp(req).rpID);
+  res.json(passkeyStatus(rp(req).rpID));
+});
 app.post("/api/approvals/:id/reject", wrap(async (req, res) => res.json(await rejectApproval(String(req.params.id)))));
 
 app.post("/api/invoices/draft", wrap(async (req, res) => {
@@ -302,7 +355,7 @@ app.post("/api/webhooks/paypal", wrap(async (req, res) => {
 const webDist = join(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
 if (existsSync(webDist)) {
   app.use(express.static(webDist));
-  app.get(/^\/(?!api\/|mcp).*/, (_req, res) => res.sendFile(join(webDist, "index.html")));
+  app.get(/^\/(?!api\/|mcp|\.well-known).*/, (_req, res) => res.sendFile(join(webDist, "index.html")));
 }
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

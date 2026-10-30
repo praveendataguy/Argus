@@ -1,5 +1,5 @@
 import { config } from "./config.js";
-import { agentPayments, releaseReservation } from "./firewall.js";
+import { agentPayments, issueReceipt, releaseReservation } from "./firewall.js";
 import { gatewayFor, paypal } from "./paypal/index.js";
 import { newId, store, type Approval, type ApprovalKind } from "./store.js";
 
@@ -79,6 +79,7 @@ export async function executeApproval(id: string, by: "human" | "policy" = "huma
       if (p) {
         p.verdict = "approved";
         p.reference = a.result;
+        issueReceipt(p);
         store.changed("firewall");
       }
     }

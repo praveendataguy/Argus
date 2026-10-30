@@ -53,6 +53,7 @@ function DisputeCard({ d, tx }: { d: Dispute; tx?: AppState["transactions"][numb
         </div>
       </header>
       <blockquote>“{d.buyerMessage || "No message from buyer"}”</blockquote>
+      {d.tribunal && <Tribunal t={d.tribunal} />}
       {c ? (
         <div className={`case case-${c.recommendation}`}>
           <div className="case-head">
@@ -74,6 +75,11 @@ function DisputeCard({ d, tx }: { d: Dispute; tx?: AppState["transactions"][numb
           </button>
         )
       )}
+      {d.status !== "RESOLVED" && d.tribunal?.status !== "sitting" && (
+        <button className="tribunal-btn" onClick={() => api(`/disputes/${d.id}/tribunal`, {})}>
+          ⚖️ {d.tribunal ? "Re-argue" : "Convene AI tribunal"}: counsel vs advocate, independent judge
+        </button>
+      )}
     </article>
   );
 }
@@ -88,5 +94,38 @@ function WinMeter({ p }: { p: number }) {
       </span>
       <b>{pct}%</b>
     </span>
+  );
+}
+
+const ROLE = {
+  prosecutor: "👔 Merchant's counsel",
+  defender: "🙋 Buyer's advocate",
+  judge: "👩‍⚖️ Chief judge",
+};
+
+function Tribunal({ t }: { t: NonNullable<Dispute["tribunal"]> }) {
+  const r = t.ruling;
+  return (
+    <div className="tribunal">
+      <div className="tribunal-head">
+        <b>⚖️ Tribunal {t.status === "sitting" ? "in session…" : "ruling"}</b>
+        <span className="muted small">{t.by === "ai" ? "three independent Claude agents" : "rules engine (AI offline)"} · {ago(t.at)}</span>
+      </div>
+      <div className="bench">
+        {t.transcript.map((turn, i) => (
+          <div key={i} className={`turn turn-${turn.role}`}>
+            <div className="turn-role">{ROLE[turn.role]} · {turn.stage}</div>
+            <div>{turn.text}</div>
+            {turn.points && turn.points.length > 0 && <ul className="small">{turn.points.map((p) => <li key={p}>{p}</li>)}</ul>}
+          </div>
+        ))}
+      </div>
+      {r && (
+        <div className="small" style={{ marginTop: 8 }}>
+          {r.misstatements.length > 0 && <div className="bad">Unsupported claims called out: {r.misstatements.join("; ")}</div>}
+          <div className="muted">Dissent: {r.dissent}</div>
+        </div>
+      )}
+    </div>
   );
 }

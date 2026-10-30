@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { mandates, payees, requestAgentPayment } from "./firewall.js";
+import { mandates, mandateTokens, payees, requestAgentPayment } from "./firewall.js";
 
 /**
  * Argus as an MCP server: any MCP-capable agent (Claude Desktop, Claude Code,
@@ -20,7 +20,7 @@ export function createMcpServer() {
     async ({ agentId }) => {
       const m = mandates.find((x) => x.agentId === agentId);
       const text = m
-        ? JSON.stringify({ ...m, remaining: m.monthlyBudget - m.spent, payees: payees.filter((p) => m.allowedPayees.includes(p.id)) }, null, 2)
+        ? JSON.stringify({ ...m, remaining: m.monthlyBudget - m.spent, payees: payees.filter((p) => m.allowedPayees.includes(p.id)), mandateToken: mandateTokens.get(m.agentId) }, null, 2)
         : `No mandate for ${agentId}.`;
       return { content: [{ type: "text", text }] };
     },
@@ -38,6 +38,8 @@ export function createMcpServer() {
         amount: z.number().positive(),
         purpose: z.string(),
         context: z.string().optional(),
+        mandateToken: z.string().optional().describe("Owner-signed mandate credential from argus_get_mandate"),
+        nonce: z.string().min(8).optional().describe("Unique id for this payment (e.g. a UUID). Reusing a nonce is rejected, so retries can't double-pay."),
       },
     },
     async (input) => {
@@ -46,6 +48,7 @@ export function createMcpServer() {
         `Verdict: ${p.verdict.toUpperCase()}`,
         ...p.checks.map((c) => `${c.pass ? "✓" : "✗"} ${c.name}: ${c.detail}`),
         p.reference ? `Reference: ${p.reference}` : "",
+        p.receipt ? `Signed receipt: ${p.receipt}` : "",
         p.verdict === "held" ? "A human must approve this payment in the Argus dashboard." : "",
       ].filter(Boolean);
       return { content: [{ type: "text", text: lines.join("\n") }], isError: p.verdict === "blocked" };

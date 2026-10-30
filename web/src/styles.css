@@ -303,3 +303,45 @@ a { color: #7fb0ff; }
   .arow { grid-template-columns: 44px 62px 1fr; }
   .arow .aactor, .arow .ahash { display: none; }
 }
+
+/* ---------- trust center ---------- */
+.trust .keyrow { display: flex; gap: 10px; align-items: center; padding: 4px 0; flex-wrap: wrap; }
+.tokenbox { width: 100%; margin: 8px 0; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 8px; resize: vertical; word-break: break-all; }
+.tokenwrap { white-space: pre-wrap; word-break: break-all; max-height: 120px; overflow: auto; }
+.row-gap.wrap { flex-wrap: wrap; }
+.small-btn { padding: 3px 9px; font-size: 12px; }
+.receipt { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.receipt .good, .good { color: #4ade80; }
+.cp { display: flex; gap: 18px; align-items: baseline; flex-wrap: wrap; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin: 8px 0 10px; }
+.proofpath { margin: 8px 0 0; padding-left: 30px; max-height: 220px; overflow: auto; }
+.proofpath li { padding: 1px 0; }
+
+/* ---------- tribunal ---------- */
+.tribunal { margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--panel-2); }
+.tribunal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.bench { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.turn { border-radius: 8px; padding: 8px 10px; border: 1px solid var(--line); background: var(--panel); }
+.turn-prosecutor { border-left: 3px solid #5b8def; }
+.turn-defender { border-left: 3px solid #b5781a; }
+.turn-judge { grid-column: 1 / -1; border-left: 3px solid var(--violet); }
+.turn ul { margin: 6px 0 0; padding-left: 18px; }
+.turn-role { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+@media (max-width: 720px) { .bench { grid-template-columns: 1fr; } }
+
+/* ---------- ML ---------- */
+.mlbars { display: grid; grid-template-columns: minmax(150px, 220px) 1fr 48px; gap: 4px 10px; align-items: center; font-size: 12px; }
+.mlbar { position: relative; height: 10px; background: var(--panel-2); border-radius: 3px; }
+.mlbar > span { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+.mlbar .pos { left: 50%; background: #b5781a; }
+.mlbar .neg { right: 50%; background: #5b8def; }
+.mlbar::after { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--muted); }
+
+/* ---------- voice ---------- */
+.voice { display: flex; align-items: center; gap: 8px; }
+.voice button.listening { background: #7f1d1d; border-color: var(--red); animation: pulse 1.2s infinite; }
+.voice-text { font-size: 12px; color: var(--muted); max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.15); } }
+.small.bad, .receipt .bad { color: #f87171; }
+.tribunal-btn { margin-top: 10px; }
+.mlx { margin: 12px 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2); }
+.mlx .mlbars { grid-template-columns: minmax(120px, 1fr) 90px 44px; margin: 8px 0 6px; }

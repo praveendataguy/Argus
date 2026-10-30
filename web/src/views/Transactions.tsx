@@ -1,6 +1,6 @@
 import { AllCommunityModule, ModuleRegistry, colorSchemeDark, themeQuartz, type ColDef, type ICellRendererParams } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
-import { useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { ago, api, usd } from "../api";
 import type { AppState, Transaction } from "../types";
 
@@ -105,9 +105,45 @@ function TxDetail({ tx, onClose }: { tx: Transaction; onClose: () => void }) {
       ) : (
         <p className="muted">Not analysed yet.</p>
       )}
+      <MlExplain tx={tx} />
       <button className="primary" onClick={() => api(`/transactions/${tx.id}/analyse`, {})}>
         {tx.risk ? "Re-analyse with Risk Watch" : "Analyse with Risk Watch"}
       </button>
     </aside>
+  );
+}
+
+interface Explanation {
+  probability: number;
+  version: number;
+  contributions: { feature: string; label: string; value: number; contribution: number }[];
+}
+
+/** The ML model's second opinion, with exact per-feature attributions. */
+function MlExplain({ tx }: { tx: Transaction }) {
+  const [e, setE] = useState<Explanation | null>(null);
+  useEffect(() => {
+    api<Explanation>(`/ml/explain/${tx.id}`).then(setE).catch(() => setE(null));
+  }, [tx.id, tx.risk?.score]);
+  if (!e) return null;
+  const top = e.contributions.filter((c) => Math.abs(c.contribution) > 0.05).slice(0, 6);
+  const max = Math.max(0.01, ...top.map((c) => Math.abs(c.contribution)));
+  const pct = Math.round(e.probability * 100);
+  return (
+    <div className="mlx">
+      <div className="verdict-head">
+        📈 ML second opinion: <b>{pct}%</b> fraud <span className="muted small">· model v{e.version}</span>
+      </div>
+      <div className="mlbars">
+        {top.map((c) => (
+          <Fragment key={c.feature}>
+            <span title={`value ${c.value}`}>{c.label} <span className="muted">({c.value})</span></span>
+            <span className="mlbar"><span className={c.contribution >= 0 ? "pos" : "neg"} style={{ width: `${(Math.abs(c.contribution) / max) * 50}%` }} /></span>
+            <span className="mono">{c.contribution >= 0 ? "+" : ""}{c.contribution.toFixed(2)}</span>
+          </Fragment>
+        ))}
+      </div>
+      <div className="small muted">Bars are exact log-odds contributions vs. the average order.</div>
+    </div>
   );
 }

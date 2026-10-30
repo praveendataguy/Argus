@@ -9,9 +9,11 @@ import { Network } from "./views/Network";
 import { Observability } from "./views/Observability";
 import { Storefront } from "./views/Storefront";
 import { Transactions } from "./views/Transactions";
+import { TrustCenter } from "./views/TrustCenter";
+import { Voice } from "./Voice";
 import { WarGame } from "./views/WarGame";
 
-const TABS = ["Command Center", "Transactions", "Fraud Rings", "War Game", "Agent Firewall", "Disputes", "Billing", "Storefront", "Observability"] as const;
+const TABS = ["Command Center", "Transactions", "Fraud Rings", "War Game", "Agent Firewall", "Trust Center", "Disputes", "Billing", "Storefront", "Observability"] as const;
 type Tab = (typeof TABS)[number];
 
 const AUTONOMY: { value: Autonomy; label: string; hint: string }[] = [
@@ -48,6 +50,7 @@ export function App() {
           </span>
           <span className={`dot ${connected ? "dot-on" : ""}`} title={connected ? "Live" : "Reconnecting"} />
         </div>
+        <Voice go={(t) => setTab(t as Tab)} aiOnline={config.aiOnline} />
         <div className="autonomy" role="radiogroup" aria-label="Agent autonomy">
           {AUTONOMY.map((a) => (
             <button
@@ -80,6 +83,7 @@ export function App() {
         {tab === "Fraud Rings" && <Network state={state} />}
         {tab === "War Game" && <WarGame state={state} />}
         {tab === "Agent Firewall" && <Firewall config={config} state={state} />}
+        {tab === "Trust Center" && <TrustCenter state={state} />}
         {tab === "Disputes" && <Disputes state={state} />}
         {tab === "Billing" && <Billing config={config} state={state} />}
         {tab === "Storefront" && <Storefront config={config} />}

@@ -17,6 +17,8 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 | **Ring Hunter** 🕸️ | Linked-account clusters | Decides fraud ring or benign household, holds and cancels ring orders | Payments v2 (refunds) |
 | **Red team / Blue team** 🗡️🛡️ | The war game | Red invents attacks, blue writes and backtests new detection rules | (Argus scoring engine) |
 | **Intent judge** 🧱 | Payments requested by other AI agents | Independently judges each payment against the owner's mandate | Payouts v1 |
+| **Tribunal** ⚖️ (counsel, advocate, judge) | Disputes | Adversarial debate with an independent ruling that must flag unsupported claims | Disputes v1 |
+| **ML model** 📈 | Every order, every war-game wave | Explainable second opinion, retrained after each round | — |
 
 ### 🕸️ Fraud ring graph
 
@@ -28,13 +30,17 @@ A **red-team agent** reads what Argus is known to check and invents waves of syn
 
 ### 🧱 Agent payment firewall (MCP)
 
-AI agents are starting to spend money, and a prompt injection on any web page they read can redirect it. Argus is an **MCP server** (`/mcp`, Streamable HTTP) that agents pay through instead of holding PayPal credentials. Each payment goes through five checks:
+AI agents are starting to spend money, and a prompt injection on any web page they read can redirect it. Argus is an **MCP server** (`/mcp`, Streamable HTTP) that agents pay through instead of holding PayPal credentials. Each payment goes through these checks:
 
+0. **Signed mandate** (in the spirit of AP2, the Agent Payments Protocol): the owner signs each agent's spending mandate as an Ed25519 compact JWS. The signed credential, not the server's mutable record, sets the limits, so an agent that edits its own mandate ("forges a bigger mandate" in the demo) fails signature verification.
 1. **Mandate**: the owner's stated purpose for this agent.
 2. **Payee allowlist**: only approved PayPal merchants.
 3. **Per-payment limit and monthly budget**: reserved on request and released if a human rejects.
 4. **Injection scan**: catches instruction-override phrases, fake system notices, manufactured urgency, look-alike PayPal domains and "don't tell the user".
 5. **Independent AI intent judge**: a separate model that never sees the agent's reasoning, only the mandate and the content the agent was reading.
+6. **Replay protection**: each request can carry a single-use nonce. A captured request sent again is blocked.
+
+Every settled payment gets a **receipt signed by Argus** (amount, payee, PayPal reference, mandate hash, checks passed). Public keys are at `/.well-known/jwks.json`, so anyone can verify mandates and receipts offline.
 
 Payments that pass are settled with **PayPal Payouts**. Large ones wait for a human, and anything suspicious is blocked. The dashboard can also run a live Claude agent against a poisoned order page to show the firewall stopping it.
 
@@ -44,7 +50,25 @@ Connect any MCP client:
 { "mcpServers": { "argus-pay": { "type": "http", "url": "https://<your-host>/mcp" } } }
 ```
 
-Tools: `argus_get_mandate(agentId)`, `argus_pay(agentId, payee, amount, purpose, context?)`.
+Tools: `argus_get_mandate(agentId)` (returns the signed `mandateToken`), `argus_pay(agentId, payee, amount, purpose, context?, mandateToken?, nonce?)` (returns the signed receipt).
+
+### 🔐 Trust center: verify, don't trust
+
+- **Passkey step-up (WebAuthn)**: after an operator enrols a passkey, approving anything above `PASSKEY_STEP_UP_ABOVE` ($100) needs a fresh passkey assertion. The challenge is derived from the hash of that exact approval (id, kind, amount, payload), so what you see is what you sign, and a hijacked session or an edited request can't reuse it. Each step-up is written to the audit log.
+- **Credential inspector**: paste any Argus token to verify it, or press *Tamper with it* to raise a limit inside a real mandate and watch the signature fail.
+- **Transparency log**: the audit log is also an RFC 6962 Merkle tree. Argus signs a checkpoint (tree size and root) every 100 entries. With one checkpoint you can prove that any entry is in the log using about log₂(n) hashes, and the browser recomputes them with WebCrypto.
+
+### ⚖️ AI tribunal for disputes
+
+Before Argus commits to a dispute, two adversarial agents argue it. **Merchant's counsel** argues to contest and the **buyer's advocate** argues to refund. Each writes an opening brief and then rebuts the other. An independent **chief judge** rules on the record, gives a win probability, names the deciding facts and the strongest dissent, and has to call out any claim that the case file does not support. The ruling replaces any earlier single-agent recommendation in the approval queue.
+
+### 📈 Explainable ML risk model
+
+Next to the rules, Argus trains a logistic regression in-process on 14 interpretable features: account age, linked accounts, drop-address patterns, geo mismatches, velocity and others. It starts from the labelled seeded history and **retrains after every war-game round** on the wave it just saw. Each round records how the model scored attacks it had never been trained on. In the scripted game it flags waves 2 and 4 that the rules miss on first contact. Because the model is linear, each score splits exactly into per-feature log-odds contributions, and the transaction drawer shows that breakdown for every order.
+
+### 🎙️ Voice command center
+
+The 🎙️ button in the header uses the browser's Web Speech API. You can say "open fraud rings", "run a risk sweep", "play a war game round", "simulate a card-testing attack" or "verify the audit log", or ask the copilot anything. Voice is limited on purpose: it can never approve money or switch to Autopilot.
 
 ### 📈 Observability and tamper-evident audit
 

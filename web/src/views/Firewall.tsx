@@ -12,6 +12,7 @@ interface Mandate {
   humanAbove: number;
   allowedPayees: string[];
   spent: number;
+  token: string;
 }
 
 interface Check {
@@ -34,6 +35,9 @@ interface Payment {
   verdict: "approved" | "held" | "blocked";
   reference?: string;
   scenario?: string;
+  mandateHash?: string;
+  receipt?: string;
+  nonce?: string;
 }
 
 interface Firewall {
@@ -42,6 +46,18 @@ interface Firewall {
   payments: Payment[];
   scenarios: { id: string; label: string }[];
   mcpUrl: string;
+  keys: { owner: string; argus: string };
+}
+
+function Receipt({ token }: { token: string }) {
+  const [v, setV] = useState<{ valid: boolean; kid?: string; reason?: string } | null>(null);
+  return (
+    <div className="receipt small">
+      🧾 Signed receipt <span className="mono muted">{token.slice(0, 28)}…</span>
+      <button className="small-btn" onClick={() => api<typeof v>("/credentials/verify", { token }).then(setV)}>Verify</button>
+      {v && <span className={v.valid ? "good" : "bad"}>{v.valid ? `✓ signed by ${v.kid}` : `✗ ${v.reason}`}</span>}
+    </div>
+  );
 }
 
 const VERDICT = { approved: "✅ Paid via PayPal", held: "⏸ Waiting for a human", blocked: "⛔ Blocked" };
@@ -76,7 +92,8 @@ export function Firewall({ config, state }: { config: AppConfig; state: AppState
           <h2>Agent payment firewall</h2>
           <p className="muted">
             AI agents never hold PayPal credentials. They pay through Argus over MCP, and every payment is checked against the owner's mandate, scanned for
-            prompt injection and judged by an independent model before PayPal settles it.
+            prompt injection and judged by an independent model before PayPal settles it. Mandates are owner-signed credentials, every request
+            carries a single-use nonce, and every settled payment gets a receipt signed by Argus.
           </p>
         </div>
       </section>
@@ -93,6 +110,10 @@ export function Firewall({ config, state }: { config: AppConfig; state: AppState
                   <span className="mono small muted">{m.agentId}</span>
                 </div>
                 <div className="small muted">{m.purpose}</div>
+                <details className="small">
+                  <summary>🔏 Signed mandate · {fw.keys.owner} (Ed25519)</summary>
+                  <pre className="code tokenwrap">{m.token}</pre>
+                </details>
                 <div className="budget">
                   <div className="budgetbar"><span style={{ width: `${pct}%` }} className={pct > 85 ? "hot" : ""} /></div>
                   <span className="small">{usd(m.spent)} of {usd(m.monthlyBudget)}</span>
@@ -144,6 +165,7 @@ export function Firewall({ config, state }: { config: AppConfig; state: AppState
                 ))}
               </ul>
               {p.reference && <div className="small mono muted">{p.reference}</div>}
+              {p.receipt && <Receipt token={p.receipt} />}
               {p.context && (
                 <details>
                   <summary className="small">What the agent was reading</summary>

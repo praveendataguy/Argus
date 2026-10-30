@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requestAction } from "./actions.js";
 import { client, defineTool, runAgent, type AgentSpec } from "./agents/llm.js";
 import { config } from "./config.js";
+import { canonical, sha256, signToken, verifyToken } from "./credentials.js";
 import { endRun, recordUsage, startRun } from "./observability.js";
 import { newId, store } from "./store.js";
 
@@ -56,6 +57,12 @@ export interface AgentPayment {
   verdict: "approved" | "held" | "blocked";
   reference?: string;
   scenario?: string;
+  /** Hash of the owner-signed mandate this payment was authorised under. */
+  mandateHash?: string;
+  /** Argus-signed receipt (compact JWS), issued once PayPal settles. */
+  receipt?: string;
+  /** Agent-chosen idempotency nonce; each one can authorise at most one payment. */
+  nonce?: string;
 }
 
 export const payees: Payee[] = [
@@ -105,6 +112,49 @@ export const mandates: Mandate[] = [
 ];
 
 export const agentPayments: AgentPayment[] = [];
+/** Nonce → payment id. A captured request can't be replayed to pay twice. */
+const usedNonces = new Map<string, string>();
+
+/* --------------------------- signed mandates (AP2-style) --------------------------- */
+
+const MANDATE_TTL_DAYS = 30;
+
+/** The owner signs each agent's mandate once; agents present the token when they pay. */
+export const mandateTokens = new Map<string, string>(
+  mandates.map((m) => [
+    m.agentId,
+    signToken("owner", {
+      type: "AgentSpendingMandate",
+      sub: m.agentId,
+      purpose: m.purpose,
+      perTxLimit: m.perTxLimit,
+      monthlyBudget: m.monthlyBudget,
+      humanAbove: m.humanAbove,
+      allowedPayees: m.allowedPayees,
+      currency: config.policy.currency,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + MANDATE_TTL_DAYS * 86_400,
+    }),
+  ]),
+);
+
+export function issueReceipt(p: AgentPayment) {
+  p.receipt = signToken("argus", {
+    type: "AgentPaymentReceipt",
+    paymentId: p.id,
+    agentId: p.agentId,
+    payee: p.payee,
+    amount: p.amount,
+    currency: p.currency,
+    paypalReference: p.reference ?? null,
+    mandateHash: p.mandateHash ?? null,
+    nonce: p.nonce ?? null,
+    jti: p.id,
+    checks: p.checks.map((c) => `${c.pass ? "pass" : "fail"}:${c.name}`),
+    iat: Math.floor(Date.now() / 1000),
+  });
+  return p.receipt;
+}
 
 const INJECTION_PATTERNS: [RegExp, string][] = [
   [/ignore (all |any )?(previous|prior|above) (instructions|rules)/i, "tells the agent to ignore its instructions"],
@@ -183,12 +233,24 @@ export async function requestAgentPayment(input: {
   purpose: string;
   context?: string;
   scenario?: string;
+  mandateToken?: string;
+  nonce?: string;
 }): Promise<AgentPayment> {
-  const m = mandates.find((x) => x.agentId === input.agentId);
+  const record = mandates.find((x) => x.agentId === input.agentId);
+  // The signed credential, not the mutable server record, is the source of truth for limits.
+  const token = input.mandateToken ?? mandateTokens.get(input.agentId) ?? "";
+  const cred = token ? verifyToken(token, "owner") : { valid: false, reason: "No mandate credential presented" };
+  const signedFor = cred.valid && cred.claims?.sub === input.agentId;
+  const m: Mandate | undefined = record && signedFor ? { ...record, ...(cred.claims as Partial<Mandate>) } : record;
   const payee = payees.find((p) => p.id === input.payee || p.paypalEmail.toLowerCase() === input.payee.toLowerCase());
   const context = input.context ?? "";
   const checks: Check[] = [];
 
+  checks.push(
+    signedFor
+      ? { name: "Mandate signature", pass: true, detail: `Ed25519 signature by ${cred.kid} verified`, severity: "info" }
+      : { name: "Mandate signature", pass: false, detail: cred.valid ? `Credential was issued to ${String(cred.claims?.sub)}, not ${input.agentId}` : (cred.reason ?? "Invalid credential"), severity: "block" },
+  );
   checks.push(m?.active ? { name: "Mandate", pass: true, detail: `${m.name} · ${m.purpose}`, severity: "info" } : { name: "Mandate", pass: false, detail: `No active mandate for agent "${input.agentId}"`, severity: "block" });
   checks.push(
     payee && m?.allowedPayees.includes(payee.id)
@@ -208,6 +270,14 @@ export async function requestAgentPayment(input: {
         : { name: "Monthly budget", pass: false, detail: `Only $${left.toFixed(0)} left this month`, severity: "block" },
     );
   }
+  const replayOf = input.nonce ? usedNonces.get(input.nonce) : undefined;
+  checks.push(
+    !input.nonce
+      ? { name: "Replay protection", pass: true, detail: "No nonce supplied; request treated as new", severity: "info" }
+      : replayOf
+        ? { name: "Replay protection", pass: false, detail: `Nonce ${input.nonce.slice(0, 12)}… already authorised ${replayOf}`, severity: "block" }
+        : { name: "Replay protection", pass: true, detail: `Nonce ${input.nonce.slice(0, 12)}… is fresh`, severity: "info" },
+  );
   const hits = scanForInjection(`${input.purpose}\n${context}`);
   checks.push(hits.length ? { name: "Injection scan", pass: false, detail: hits.join("; "), severity: "block" } : { name: "Injection scan", pass: true, detail: "No injection patterns", severity: "info" });
 
@@ -236,8 +306,11 @@ export async function requestAgentPayment(input: {
     judge: verdictJudge,
     verdict: blocked ? "blocked" : needsHuman ? "held" : "approved",
     scenario: input.scenario,
+    mandateHash: token ? sha256(token).slice(0, 16) : undefined,
+    nonce: input.nonce,
   };
   agentPayments.unshift(p);
+  if (input.nonce && !replayOf) usedNonces.set(input.nonce, p.id);
 
   const failed = checks.filter((c) => !c.pass).map((c) => c.name);
   store.log({
@@ -246,8 +319,8 @@ export async function requestAgentPayment(input: {
     message: `${input.agentId} → $${input.amount.toFixed(2)} to ${payee?.name ?? input.payee}: ${p.verdict.toUpperCase()}${failed.length ? ` (${failed.join(", ")})` : ""}`,
   });
 
-  if (!blocked && m && payee) {
-    m.spent += input.amount; // reserve budget now; released if a human rejects
+  if (!blocked && m && record && payee) {
+    record.spent += input.amount; // reserve budget now; released if a human rejects
     const approval = await requestAction({
       kind: "AGENT_PAYMENT",
       requestedBy: input.agentId,
@@ -319,6 +392,24 @@ export const scenarios: Record<string, { label: string; run: () => Promise<Agent
         context: "CloudHost Pro dashboard: 'Teams like yours upgrade to Enterprise GPU ($380/mo). Upgrade now and save 10%!' Current plan: Standard ($120/mo), utilisation 18%.",
       }),
   },
+  forged: {
+    label: "Agent forges a bigger mandate",
+    run: () => {
+      // Take the real credential, raise the limits inside it, keep the old signature.
+      const [h, payload, sig] = mandateTokens.get("office-bot")!.split(".");
+      const claims = JSON.parse(Buffer.from(payload, "base64url").toString());
+      const forged = Buffer.from(canonical({ ...claims, perTxLimit: 5000, monthlyBudget: 50000, humanAbove: 5000 })).toString("base64url");
+      return requestAgentPayment({
+        scenario: "forged",
+        agentId: "office-bot",
+        payee: "nimbus-audio",
+        amount: 1800,
+        purpose: "Studio monitors for every desk",
+        context: "Nimbus Audio — 4 × Monolith Studio Monitor... (agent edited its own mandate to allow $5,000 per payment)",
+        mandateToken: `${h}.${forged}.${sig}`,
+      });
+    },
+  },
   big: {
     label: "Office agent buys headphones",
     run: () =>
@@ -330,6 +421,22 @@ export const scenarios: Record<string, { label: string; run: () => Promise<Agent
         purpose: "Orbit headphones for the new support hire starting Monday",
         context: "Nimbus Audio — Orbit Wireless Headphones $249. Ticket HR-311: 'New support hire starts Monday, needs a headset.'",
       }),
+  },
+  replay: {
+    label: "Attacker replays a captured payment",
+    run: async () => {
+      const request = {
+        agentId: "office-bot",
+        payee: "officely",
+        amount: 38,
+        purpose: "Printer toner for the support desk (order OF-55901)",
+        context: "Officely Supplies — Order #OF-55901\nItem: Toner cartridge ........ $38.00",
+        nonce: crypto.randomUUID(),
+      };
+      await requestAgentPayment({ ...request, scenario: "replay-original" });
+      // Someone on the network captured the signed request and sends it again.
+      return requestAgentPayment({ ...request, scenario: "replay" });
+    },
   },
 };
 
