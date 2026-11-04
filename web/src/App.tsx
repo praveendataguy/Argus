@@ -13,6 +13,7 @@ import { TrustCenter } from "./views/TrustCenter";
 import { Voice } from "./Voice";
 import { DemoMode } from "./DemoMode";
 import { Telemetry } from "./Telemetry";
+import { ThemePicker } from "./ThemePicker";
 import { Backdrop } from "./Backdrop";
 import { WarGame } from "./views/WarGame";
 
@@ -71,6 +72,7 @@ export function App() {
           <span className={`dot ${connected ? "dot-on" : ""}`} title={connected ? "Live" : "Reconnecting"} />
         </div>
         <DemoMode go={(t) => setTab(t as Tab)} />
+        <ThemePicker />
         <Voice go={(t) => setTab(t as Tab)} aiOnline={config.aiOnline} />
         <div className="autonomy" role="radiogroup" aria-label="Agent autonomy">
           {AUTONOMY.map((a) => (

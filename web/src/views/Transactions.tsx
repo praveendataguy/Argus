@@ -7,16 +7,16 @@ import type { AppState, Transaction } from "../types";
 ModuleRegistry.registerModules([AllCommunityModule]);
 
 const gridTheme = themeQuartz.withPart(colorSchemeDark).withParams({
-  backgroundColor: "#0c48a8",
+  backgroundColor: "var(--grid-bg, #0c48a8)",
   foregroundColor: "#eaf4ff",
-  headerBackgroundColor: "#1158c4",
-  headerTextColor: "#d6ebff",
+  headerBackgroundColor: "var(--grid-head, #1158c4)",
+  headerTextColor: "var(--grid-head-text, #d6ebff)",
   accentColor: "#33c6ff",
-  borderColor: "rgba(180, 220, 255, 0.25)",
-  oddRowBackgroundColor: "#0e4fb3",
+  borderColor: "var(--grid-border, rgba(180, 220, 255, 0.25))",
+  oddRowBackgroundColor: "var(--grid-odd, #0e4fb3)",
   fontFamily: "'JetBrains Mono', ui-monospace, monospace",
   fontSize: 12,
-  rowHoverColor: "#1a66d6",
+  rowHoverColor: "var(--grid-hover, #1a66d6)",
 });
 
 function RiskCell({ data }: ICellRendererParams<Transaction>) {
