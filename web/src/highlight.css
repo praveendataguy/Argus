@@ -74,3 +74,70 @@ html:not([data-theme]) .tabs button.on { box-shadow: 0 0 0 1px #fff, 0 0 26px -2
 @media (prefers-reduced-motion: reduce) {
   html:not([data-theme]) .cc .hero::after, html:not([data-theme]) .cc .hero h1 em { animation: none; }
 }
+
+/* ---------- Live agent wire (ticker under the hero) ---------- */
+.wire { display: flex; align-items: center; gap: 12px; margin: 0 0 14px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); overflow: hidden; }
+.wire-tag { display: inline-flex; align-items: center; gap: 8px; flex: none; font-family: var(--mono, monospace); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; padding: 5px 10px; border-radius: 8px; background: var(--red, #ff4d6d); color: #fff; }
+.wire-tag i { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: wire-blink 1s ease-in-out infinite; }
+@keyframes wire-blink { 50% { opacity: 0.2; } }
+.wire-track { flex: 1; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent); }
+.wire-run { display: inline-flex; gap: 34px; white-space: nowrap; animation: wire-scroll 60s linear infinite; }
+.wire:hover .wire-run { animation-play-state: paused; }
+@keyframes wire-scroll { to { transform: translateX(-50%); } }
+.wire-item { font-size: 13px; color: var(--text); }
+.wire-item b { font-family: var(--mono, monospace); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; margin-right: 6px; color: var(--accent, var(--blue)); }
+.wire-item::before { content: "◆"; margin-right: 8px; font-size: 9px; vertical-align: 2px; color: var(--green); }
+.wire-error::before { color: var(--red); }
+.wire-action::before { color: var(--amber, #f5b941); }
+
+/* ---------- KPI icon badges ---------- */
+.kpi-icon { position: absolute; top: 12px; right: 14px; width: 34px; height: 34px; padding: 7px; border-radius: 10px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; color: #33c6ff; background: color-mix(in srgb, currentColor 14%, transparent); }
+.kpi-green .kpi-icon { color: #12b886; }
+.kpi-amber .kpi-icon { color: #e8a200; }
+.kpi-red .kpi-icon { color: #ff4d6d; }
+.kpi-value { font-variant-numeric: tabular-nums; }
+
+/* ---------- Daylight styling for the wire, dock and panels ---------- */
+html:not([data-theme]) .wire {
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 112, 224, 0.15), 0 0 36px -8px rgba(0, 229, 255, 0.8), 0 14px 30px -20px rgba(0, 20, 60, 0.7);
+}
+html:not([data-theme]) .wire-item { color: #0b2a5b; }
+html:not([data-theme]) .wire-item b { color: #0070e0; }
+html:not([data-theme]) .wire-tag { background: linear-gradient(90deg, #ff3d6e, #ff7a45); box-shadow: 0 0 16px -2px rgba(255, 61, 110, 0.8); }
+html:not([data-theme]) .kpi-icon { background: color-mix(in srgb, currentColor 16%, #fff); box-shadow: 0 0 18px -4px currentColor; }
+html:not([data-theme]) .cc .kpi-value { font-size: 36px; letter-spacing: -0.02em; }
+
+/* live traffic controls as a frosted dock */
+html:not([data-theme]) .cc .sim {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 0 30px -10px rgba(0, 229, 255, 0.8);
+  backdrop-filter: blur(10px);
+}
+html:not([data-theme]) .cc .sim button:not(.primary) {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0b2a5b;
+  border: 1px solid #fff;
+  font-weight: 600;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+html:not([data-theme]) .cc .sim button:not(.primary):hover { transform: translateY(-2px); box-shadow: 0 0 22px -4px rgba(0, 229, 255, 0.95); }
+html:not([data-theme]) .cc .sim button.primary { border-radius: 999px; }
+
+/* section headers with a glowing accent bar */
+html:not([data-theme]) .cc .cc-grid .panel h2 { display: flex; align-items: center; gap: 10px; }
+html:not([data-theme]) .cc .cc-grid .panel h2::after {
+  content: "";
+  flex: 1;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.9), rgba(0, 229, 255, 0.6), transparent);
+}
+
+@media (prefers-reduced-motion: reduce) { .wire-run, .wire-tag i { animation: none; } }
+@media (max-width: 600px) { .wire-tag { font-size: 0; gap: 0; padding: 7px; } }
