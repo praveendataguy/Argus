@@ -198,8 +198,8 @@ export function Globe({ txs }: { txs: Transaction[] }) {
       ctx.fillStyle = halo;
       ctx.fillRect(0, 0, w, h);
       const ocean = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
-      ocean.addColorStop(0, "#0a2a5c");
-      ocean.addColorStop(1, "#010a1f");
+      ocean.addColorStop(0, "#1456b8");
+      ocean.addColorStop(1, "#031c4d");
       ctx.beginPath();
       ctx.arc(cx, cy, R, 0, Math.PI * 2);
       ctx.fillStyle = ocean;
