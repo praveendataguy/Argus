@@ -90,7 +90,7 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
   );
 }
 
-const TONE: Record<string, string> = { green: "#2ee59d", amber: "#ffc439", red: "#ff4d6d" };
+const TONE: Record<string, string> = { green: "#2ee59d", amber: "#ffc439", red: "#ff4d6d", blue: "#33c6ff" };
 
 function Kpi({ label, value, sub, tone, spark }: { label: string; value: string; sub: string; tone?: string; spark?: number[] }) {
   return (
@@ -98,7 +98,7 @@ function Kpi({ label, value, sub, tone, spark }: { label: string; value: string;
       <div className="kpi-label">{label}</div>
       <div className="kpi-value">{value}</div>
       <div className="kpi-sub">{sub}</div>
-      {spark && spark.length > 1 && <Spark values={spark} color={TONE[tone ?? ""] ?? "#ffc439"} />}
+      {spark && spark.length > 1 && <Spark values={spark} color={TONE[tone ?? ""] ?? "#33c6ff"} />}
     </div>
   );
 }
@@ -155,21 +155,21 @@ function Radar({ txs }: { txs: AppState["transactions"] }) {
     <svg className="radar" viewBox="0 0 220 220" role="img" aria-label="Threat radar of recent payments">
       <defs>
         <radialGradient id="rbg">
-          <stop offset="0" stopColor="#ffc439" stopOpacity="0.12" />
-          <stop offset="1" stopColor="#ffc439" stopOpacity="0" />
+          <stop offset="0" stopColor="#33c6ff" stopOpacity="0.12" />
+          <stop offset="1" stopColor="#33c6ff" stopOpacity="0" />
         </radialGradient>
         <linearGradient id="beam" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0" stopColor="#ffc439" stopOpacity="0" />
-          <stop offset="1" stopColor="#ffc439" stopOpacity="0.55" />
+          <stop offset="0" stopColor="#33c6ff" stopOpacity="0" />
+          <stop offset="1" stopColor="#33c6ff" stopOpacity="0.55" />
         </linearGradient>
       </defs>
-      <circle cx={C} cy={C} r={104} fill="url(#rbg)" stroke="rgba(255,196,57,0.35)" />
+      <circle cx={C} cy={C} r={104} fill="url(#rbg)" stroke="rgba(51,198,255,0.45)" />
       {[78, 52, 26].map((r) => <circle key={r} cx={C} cy={C} r={r} fill="none" stroke="rgba(255,255,255,0.08)" />)}
       <line x1={C - 104} y1={C} x2={C + 104} y2={C} stroke="rgba(255,255,255,0.06)" />
       <line x1={C} y1={C - 104} x2={C} y2={C + 104} stroke="rgba(255,255,255,0.06)" />
       <g className="radar-sweep">
         <path d={`M${C},${C} L${C + 104},${C} A104,104 0 0,0 ${C + 104 * Math.cos(-0.6)},${C + 104 * Math.sin(-0.6)} Z`} fill="url(#beam)" />
-        <line x1={C} y1={C} x2={C + 104} y2={C} stroke="#ffc439" strokeWidth="1.5" style={{ filter: "drop-shadow(0 0 6px #ffc439)" }} />
+        <line x1={C} y1={C} x2={C + 104} y2={C} stroke="#33c6ff" strokeWidth="1.5" style={{ filter: "drop-shadow(0 0 6px #33c6ff)" }} />
       </g>
       {blips.map((b) => {
         const color = b.score >= 60 ? "#ff4d6d" : b.score >= 30 ? "#ffc439" : "#2ee59d";
@@ -179,7 +179,7 @@ function Radar({ txs }: { txs: AppState["transactions"] }) {
           </circle>
         );
       })}
-      <circle cx={C} cy={C} r={4} fill="#ffc439" />
+      <circle cx={C} cy={C} r={4} fill="#33c6ff" />
     </svg>
   );
 }
