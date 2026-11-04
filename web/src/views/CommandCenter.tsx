@@ -39,11 +39,13 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
         <HeroArt />
       </section>
 
+      <Wire events={state.events} />
+
       <section className="kpis">
-        <Kpi label="Gross volume" value={usd(gross)} sub={`${txs.length} PayPal captures`} spark={daily(txs, (t) => t.amount)} />
-        <Kpi label="Fraud stopped" value={usd(blocked)} sub="held or cancelled before shipping" tone="green" spark={txs.filter((t) => t.risk).map((t) => t.risk!.score)} />
-        <Kpi label="Dispute exposure" value={usd(exposure)} sub={`${state.disputes.filter((d) => d.status !== "RESOLVED").length} open cases`} tone="amber" spark={daily(txs, (t) => (t.buyer.accountAgeDays < 30 ? t.amount : 0))} />
-        <Kpi label="Awaiting you" value={String(pending.length)} sub={`auto-approve ≤ ${usd(config.autoApproveLimit)} in Guarded`} tone={pending.length ? "red" : undefined} spark={cumulative(state.approvals.map((a) => a.createdAt))} />
+        <Kpi icon="volume" label="Gross volume" value={gross} format={usd} sub={`${txs.length} PayPal captures`} spark={daily(txs, (t) => t.amount)} />
+        <Kpi icon="shield" label="Fraud stopped" value={blocked} format={usd} sub="held or cancelled before shipping" tone="green" spark={txs.filter((t) => t.risk).map((t) => t.risk!.score)} />
+        <Kpi icon="scale" label="Dispute exposure" value={exposure} format={usd} sub={`${state.disputes.filter((d) => d.status !== "RESOLVED").length} open cases`} tone="amber" spark={daily(txs, (t) => (t.buyer.accountAgeDays < 30 ? t.amount : 0))} />
+        <Kpi icon="bell" label="Awaiting you" value={pending.length} format={(n) => String(Math.round(n))} sub={`auto-approve ≤ ${usd(config.autoApproveLimit)} in Guarded`} tone={pending.length ? "red" : undefined} spark={cumulative(state.approvals.map((a) => a.createdAt))} />
       </section>
 
       <ThreatGlobePanel txs={txs} />
@@ -94,11 +96,71 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
 
 const TONE: Record<string, string> = { green: "#2ee59d", amber: "#ffc439", red: "#ff4d6d", blue: "#33c6ff" };
 
-function Kpi({ label, value, sub, tone, spark }: { label: string; value: string; sub: string; tone?: string; spark?: number[] }) {
+const ICONS: Record<string, string> = {
+  volume: "M3 17l5-5 4 4 8-8M15 8h5v5",
+  shield: "M12 3l8 3v6c0 5-3.5 8.5-8 9.5C7.5 20.5 4 17 4 12V6zM8.5 12l2.5 2.5 4.5-5",
+  scale: "M12 4v16M6 20h12M5 8h14M7 8l-3 6a3 3 0 0 0 6 0zM17 8l-3 6a3 3 0 0 0 6 0z",
+  bell: "M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0",
+};
+
+/** Eases a number from its last value to the new one, so KPIs count up live. */
+function useCountUp(target: number, ms = 900) {
+  const [shown, setShown] = useState(0);
+  const from = useRef(0);
+  useEffect(() => {
+    const start = performance.now();
+    const a = from.current;
+    let raf = 0;
+    const tick = (now: number) => {
+      const k = Math.min(1, (now - start) / ms);
+      const v = a + (target - a) * (1 - Math.pow(1 - k, 3));
+      setShown(v);
+      if (k < 1) raf = requestAnimationFrame(tick);
+      else from.current = target;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      from.current = target;
+    };
+  }, [target, ms]);
+  return shown;
+}
+
+/** A scrolling wire of the latest agent decisions, like a trading-floor ticker. */
+function Wire({ events }: { events: AgentEvent[] }) {
+  const items = events.filter((e) => e.kind === "decision" || e.kind === "action" || e.kind === "error").slice(-14).reverse();
+  if (items.length === 0) return null;
+  // Rendered twice back to back so the scroll loops seamlessly.
+  const row = (copy: string) => items.map((e) => (
+    <span key={e.id + copy} className={`wire-item wire-${e.kind}`} aria-hidden={copy === "b" || undefined}>
+      <b>{e.agent}</b> {e.message.length > 110 ? e.message.slice(0, 107) + "…" : e.message}
+    </span>
+  ));
+  return (
+    <section className="wire" aria-label="Latest agent decisions">
+      <span className="wire-tag">
+        <i /> Live agent wire
+      </span>
+      <div className="wire-track">
+        <div className="wire-run">
+          {row("a")}
+          {row("b")}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Kpi({ icon, label, value, format, sub, tone, spark }: { icon: string; label: string; value: number; format: (n: number) => string; sub: string; tone?: string; spark?: number[] }) {
+  const shown = useCountUp(value);
   return (
     <div className={`kpi ${tone ? `kpi-${tone}` : ""}`}>
+      <svg className="kpi-icon" viewBox="0 0 24 24" aria-hidden>
+        <path d={ICONS[icon]} />
+      </svg>
       <div className="kpi-label">{label}</div>
-      <div className="kpi-value">{value}</div>
+      <div className="kpi-value">{format(shown)}</div>
       <div className="kpi-sub">{sub}</div>
       {spark && spark.length > 1 && <Spark values={spark} color={TONE[tone ?? ""] ?? "#33c6ff"} />}
     </div>
