@@ -27,8 +27,41 @@ interface ChatResponse {
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
-export async function groqChat(body: { messages: ChatMessage[]; tools?: ChatTool[]; json?: boolean; maxTokens?: number }): Promise<ChatResponse> {
+/** Parses Groq durations such as "7.55s", "1m2.5s" or "450ms" into milliseconds. */
+function parseDuration(v: string | null | undefined): number | null {
+  if (!v) return null;
+  if (/^\d+(\.\d+)?$/.test(v.trim())) return Number(v) * 1000;
+  let ms = 0;
+  let matched = false;
+  for (const [, n, unit] of v.matchAll(/(\d+(?:\.\d+)?)(ms|h|m|s)/g)) {
+    matched = true;
+    ms += Number(n) * (unit === "ms" ? 1 : unit === "s" ? 1000 : unit === "m" ? 60_000 : 3_600_000);
+  }
+  return matched ? ms : null;
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/*
+ * The free tier allows only a few thousand tokens per minute, and several agents
+ * (tribunal, war game, risk sweep) can run at once. Calls go through one queue,
+ * and when Groq reports the token budget is nearly spent the next call waits for
+ * the reset instead of failing with a 429 halfway through an agent's run.
+ */
+let queue: Promise<unknown> = Promise.resolve();
+let notBefore = 0;
+const LOW_WATER_TOKENS = Number(process.env.GROQ_LOW_WATER_TOKENS ?? 2500);
+
+export function groqChat(body: { messages: ChatMessage[]; tools?: ChatTool[]; json?: boolean; maxTokens?: number }): Promise<ChatResponse> {
+  const run = queue.then(() => groqChatNow(body));
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+async function groqChatNow(body: { messages: ChatMessage[]; tools?: ChatTool[]; json?: boolean; maxTokens?: number }): Promise<ChatResponse> {
   for (let attempt = 0; ; attempt++) {
+    const delay = notBefore - Date.now();
+    if (delay > 0) await sleep(delay);
     const res = await fetch(URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, "Content-Type": "application/json" },
@@ -42,10 +75,15 @@ export async function groqChat(body: { messages: ChatMessage[]; tools?: ChatTool
         temperature: 0.3,
       }),
     });
-    // Free-tier rate limits: back off and retry a few times.
-    if (res.status === 429 && attempt < 3) {
-      const wait = Number(res.headers.get("retry-after") ?? 2 ** attempt * 2);
-      await new Promise((r) => setTimeout(r, Math.min(20, wait) * 1000));
+    const remaining = Number(res.headers.get("x-ratelimit-remaining-tokens") ?? NaN);
+    const reset = parseDuration(res.headers.get("x-ratelimit-reset-tokens"));
+    if (Number.isFinite(remaining) && remaining < LOW_WATER_TOKENS && reset) notBefore = Date.now() + reset + 250;
+
+    if ((res.status === 429 || res.status >= 500) && attempt < 6) {
+      const text = await res.text();
+      const hinted = parseDuration(res.headers.get("retry-after")) ?? parseDuration(/try again in ([\d.hms]+)/i.exec(text)?.[1]);
+      const wait = Math.min(65_000, (hinted ?? 2 ** attempt * 2000) + 500);
+      notBefore = Math.max(notBefore, Date.now() + wait);
       continue;
     }
     if (!res.ok) throw new Error(`Groq ${res.status}: ${(await res.text()).slice(0, 300)}`);

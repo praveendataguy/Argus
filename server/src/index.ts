@@ -92,7 +92,7 @@ app.post("/api/transactions/:id/analyse", (req, res) => {
 app.post("/api/transactions/analyse-unscored", (_req, res) => {
   const ids = [...store.transactions.values()].filter((t) => !t.risk).map((t) => t.id);
   // Sequential so the feed reads like an analyst working through a queue.
-  background("Risk sweep", ids.reduce((p, id) => p.then(() => analyseTransaction(id)), Promise.resolve<unknown>(null)));
+  background("Risk sweep", ids.reduce((p, id) => p.then(() => background(`Risk analysis ${id}`, analyseTransaction(id))), Promise.resolve<unknown>(null)));
   res.status(202).json({ queued: ids });
 });
 
