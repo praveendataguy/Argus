@@ -1,28 +1,28 @@
 import { useEffect, useState } from "react";
 
 const THEMES = [
-  ["pro", "Pro"],
   ["daylight", "Daylight"],
+  ["pro", "Pro"],
   ["tron", "Tron"],
   ["cyberpunk", "Cyberpunk"],
   ["quantum", "Quantum"],
   ["matrix", "Matrix"],
   ["solar", "Solar"],
 ] as const;
-const KEY = "argus-theme";
+const KEY = "argus-theme-v2";
 
 function apply(theme: string) {
   if (theme === "daylight") document.documentElement.removeAttribute("data-theme");
   else document.documentElement.setAttribute("data-theme", theme);
 }
 
-/** Header dropdown for the colour theme. Pro is the default; the choice is remembered per browser. */
+/** Header dropdown for the colour theme. Daylight (the bright PayPal-blue look) is the default; the choice is remembered per browser. */
 export function ThemePicker() {
   const [theme, setTheme] = useState(() => {
     try {
-      return localStorage.getItem(KEY) ?? "pro";
+      return localStorage.getItem(KEY) ?? "daylight";
     } catch {
-      return "pro";
+      return "daylight";
     }
   });
   useEffect(() => {

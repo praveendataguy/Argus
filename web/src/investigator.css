@@ -81,3 +81,11 @@
   .inv-verdict { text-align: left; }
 }
 @media (prefers-reduced-motion: reduce) { .inv-ic-run, .inv-arc, .badge-live { animation: none; } }
+
+/* Daylight (default, bright PayPal blue): give verdict chips a white card so red/green stay readable. */
+html:not([data-theme]) .inv-verdict,
+html:not([data-theme]) .inv-tag { background: rgba(255, 255, 255, 0.94); }
+html:not([data-theme]) .inv-v-fraud { color: #d6204e; }
+html:not([data-theme]) .inv-v-legitimate { color: #0a8f5a; }
+html:not([data-theme]) .inv-v-unsure { color: #b26b00; }
+html:not([data-theme]) .inv-v-running { color: #0b4fb8; }
