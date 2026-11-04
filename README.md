@@ -11,7 +11,7 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 ## For judges: try it in two minutes
 
 - **Hosted demo:** _link added before submission_ (Render free tier, so the first load can take up to a minute while it wakes).
-- **Run it yourself:** `git clone https://github.com/praveendataguy/argus && cd argus && npm install && npm run dev`, then open http://localhost:5173. No keys are needed: without them Argus uses a built-in PayPal simulator and an offline rules engine, and every feature still works. Add a free Groq key and PayPal sandbox keys to `.env` for live AI and real sandbox payments (see [Run it locally](#run-it-locally)).
+- **Run it yourself:** `git clone https://github.com/praveendataguy/Argus && cd argus && npm install && npm run dev`, then open http://localhost:5173. No keys are needed: without them Argus uses a built-in PayPal simulator and an offline rules engine, and every feature still works. Add a free Groq key and PayPal sandbox keys to `.env` for live AI and real sandbox payments (see [Run it locally](#run-it-locally)).
 - **Then:** press **▶ Live demo** in the header for a narrated tour, or open the **Investigator** tab and press **Investigate suspicious** to watch Argus work fraud cases on its own.
 
 | Agent | Watches | Does | PayPal APIs |
