@@ -18,6 +18,7 @@ import { CATCH_SCORE, game, playRound, resetGame, toggleRule } from "./wargame.j
 import { catalog, merchant, productBySku } from "./catalog.js";
 import { config, paypalMode } from "./config.js";
 import { paypal } from "./paypal/index.js";
+import { PayPalApiError } from "./paypal/rest.js";
 import { seedDemoData } from "./seed.js";
 import { simulateOrder, type Scenario } from "./simulate.js";
 import { newId, store, type Dispute, type LineItem, type Transaction } from "./store.js";
@@ -290,6 +291,10 @@ const pendingCarts = new Map<string, LineItem[]>();
 
 app.post("/api/checkout/orders/:id/capture", wrap(async (req, res) => {
   const capture = await paypal.captureOrder(String(req.params.id));
+  // A declined card still returns a 201 from PayPal; don't book it as a sale.
+  if (capture.status === "DECLINED" || capture.status === "FAILED") {
+    return res.status(402).json({ error: `PayPal ${capture.status.toLowerCase()} the payment`, status: capture.status });
+  }
   const items = pendingCarts.get(capture.orderId) ?? [{ name: "PayPal order", quantity: 1, unitAmount: capture.amount }];
   pendingCarts.delete(capture.orderId);
   const country = capture.payer.country ?? "US";
@@ -361,7 +366,9 @@ if (existsSync(webDist)) {
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const message = err instanceof Error ? err.message : String(err);
   store.log({ agent: "system", kind: "error", message });
-  res.status(500).json({ error: message });
+  // Surface PayPal's own 4xx (e.g. 422 "payer has not approved") instead of a generic 500.
+  const status = err instanceof PayPalApiError && err.status >= 400 && err.status < 500 ? err.status : 500;
+  res.status(status).json({ error: message });
 });
 
 app.listen(config.port, () => {
