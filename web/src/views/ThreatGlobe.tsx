@@ -192,24 +192,24 @@ export function Globe({ txs }: { txs: Transaction[] }) {
 
       // Atmosphere and ocean.
       const halo = ctx.createRadialGradient(cx, cy, R * 0.9, cx, cy, R * 1.35);
-      halo.addColorStop(0, "rgba(255,196,57,0.18)");
-      halo.addColorStop(0.4, "rgba(0,112,224,0.08)");
+      halo.addColorStop(0, "rgba(0,156,222,0.28)");
+      halo.addColorStop(0.4, "rgba(0,112,224,0.12)");
       halo.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = halo;
       ctx.fillRect(0, 0, w, h);
       const ocean = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
-      ocean.addColorStop(0, "#1b1d2b");
-      ocean.addColorStop(1, "#08080d");
+      ocean.addColorStop(0, "#0a2a5c");
+      ocean.addColorStop(1, "#010a1f");
       ctx.beginPath();
       ctx.arc(cx, cy, R, 0, Math.PI * 2);
       ctx.fillStyle = ocean;
       ctx.fill();
-      ctx.strokeStyle = "rgba(255,196,57,0.35)";
+      ctx.strokeStyle = "rgba(64,196,255,0.55)";
       ctx.lineWidth = 1;
       ctx.stroke();
 
       // Graticule rings for depth.
-      ctx.strokeStyle = "rgba(255,255,255,0.04)";
+      ctx.strokeStyle = "rgba(64,196,255,0.08)";
       for (let lat = -60; lat <= 60; lat += 30) {
         ctx.beginPath();
         let pen = false;
@@ -226,7 +226,7 @@ export function Globe({ txs }: { txs: Transaction[] }) {
       for (const [lon, lat] of dots) {
         const q = project(lon, lat);
         if (q.z <= 0) continue;
-        ctx.fillStyle = `rgba(255,214,120,${0.18 + q.z * 0.62})`;
+        ctx.fillStyle = `rgba(110,205,255,${0.18 + q.z * 0.68})`;
         ctx.fillRect(q.x - 1, q.y - 1, 2, 2);
       }
 

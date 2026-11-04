@@ -13,7 +13,8 @@ interface Packet { a: number; b: number; t: number; speed: number; fraud: boolea
 interface Burst { x: number; y: number; age: number; kind: "block" | "scan" }
 interface Hash { x: number; y: number; text: string; speed: number; alpha: number }
 
-const YELLOW = "255,196,57";
+const YELLOW = "64,196,255"; // PayPal sky: payments and hashes
+const GOLD = "255,196,57";
 const RED = "255,77,109";
 const SKY = "0,156,222";
 const hex = () => Array.from({ length: 8 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
@@ -98,7 +99,7 @@ export function Backdrop() {
         for (let j = i + 1; j < nodes.length; j++) {
           const d = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].y - nodes[j].y);
           if (d < LINK) {
-            ctx.strokeStyle = `rgba(255,255,255,${0.13 * (1 - d / LINK)})`;
+            ctx.strokeStyle = `rgba(120,190,255,${0.14 * (1 - d / LINK)})`;
             ctx.beginPath();
             ctx.moveTo(nodes[i].x, nodes[i].y);
             ctx.lineTo(nodes[j].x, nodes[j].y);
@@ -180,12 +181,12 @@ export function Backdrop() {
       // nodes on top; ring members pulse in yellow
       for (const n of nodes) {
         const pulse = n.ring ? 0.5 + 0.5 * Math.sin(now / 600 + n.x) : 0;
-        ctx.fillStyle = n.ring ? `rgba(${YELLOW},${0.5 + 0.4 * pulse})` : "rgba(255,255,255,0.5)";
+        ctx.fillStyle = n.ring ? `rgba(${GOLD},${0.5 + 0.4 * pulse})` : "rgba(255,255,255,0.5)";
         ctx.beginPath();
         ctx.arc(n.x, n.y, n.r + (n.ring ? 1 + pulse : 0), 0, Math.PI * 2);
         ctx.fill();
         if (n.ring) {
-          ctx.strokeStyle = `rgba(${YELLOW},${0.15 + 0.2 * pulse})`;
+          ctx.strokeStyle = `rgba(${GOLD},${0.15 + 0.2 * pulse})`;
           ctx.beginPath();
           ctx.arc(n.x, n.y, n.r + 6 + pulse * 4, 0, Math.PI * 2);
           ctx.stroke();
