@@ -11,6 +11,7 @@ import { Storefront } from "./views/Storefront";
 import { Transactions } from "./views/Transactions";
 import { TrustCenter } from "./views/TrustCenter";
 import { Voice } from "./Voice";
+import { DemoMode } from "./DemoMode";
 import { Backdrop } from "./Backdrop";
 import { WarGame } from "./views/WarGame";
 
@@ -66,6 +67,7 @@ export function App() {
           </span>
           <span className={`dot ${connected ? "dot-on" : ""}`} title={connected ? "Live" : "Reconnecting"} />
         </div>
+        <DemoMode go={(t) => setTab(t as Tab)} />
         <Voice go={(t) => setTab(t as Tab)} aiOnline={config.aiOnline} />
         <div className="autonomy" role="radiogroup" aria-label="Agent autonomy">
           {AUTONOMY.map((a) => (

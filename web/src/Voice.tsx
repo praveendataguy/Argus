@@ -53,6 +53,11 @@ async function handle(raw: string, go: (tab: string) => void, aiOnline: boolean)
     await api("/wargame/round", {});
     return "Red team wave launched. Watch the war game.";
   }
+  if (/storm|global attack/.test(t)) {
+    go("Command Center");
+    await api("/simulate/storm", { size: 14 });
+    return "Global attack storm launched. Watch the threat globe.";
+  }
   if (/risk sweep|analy[sz]e (new|unscored)/.test(t)) {
     await api("/transactions/analyse-unscored", {});
     return "Running a risk sweep on new orders.";

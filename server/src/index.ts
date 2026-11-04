@@ -20,7 +20,7 @@ import { config, paypalMode } from "./config.js";
 import { paypal } from "./paypal/index.js";
 import { PayPalApiError } from "./paypal/rest.js";
 import { seedDemoData } from "./seed.js";
-import { simulateOrder, type Scenario } from "./simulate.js";
+import { runStorm, simulateOrder, stormRunning, type Scenario } from "./simulate.js";
 import { newId, store, type Dispute, type LineItem, type Transaction } from "./store.js";
 
 attachAudit();
@@ -324,6 +324,13 @@ app.post("/api/checkout/orders/:id/capture", wrap(async (req, res) => {
   background("Risk analysis", analyseTransaction(tx.id));
   res.json({ transactionId: tx.id, captureId: tx.captureId, status: capture.status });
 }));
+
+app.post("/api/simulate/storm", (req, res) => {
+  if (stormRunning) return res.status(409).json({ error: "A storm is already running" });
+  const size = Math.max(4, Math.min(30, Number(req.body?.size ?? 14)));
+  background("Attack storm", runStorm(size, (ids) => ids.reduce((p, id) => p.then(() => background(`Risk analysis ${id}`, analyseTransaction(id))), Promise.resolve<unknown>(null))));
+  res.status(202).json({ started: true, size });
+});
 
 app.post("/api/simulate/:scenario", wrap(async (req, res) => {
   const tx = await simulateOrder(req.params.scenario as Scenario);
