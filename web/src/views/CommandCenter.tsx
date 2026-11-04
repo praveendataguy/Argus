@@ -3,6 +3,7 @@ import { ago, api, usd } from "../api";
 import { approve, type PasskeyStatus } from "../security";
 import type { AgentEvent, AppConfig, AppState, Approval } from "../types";
 import { ThreatGlobePanel } from "./ThreatGlobe";
+import { HeroArt } from "../HeroArt";
 
 export function CommandCenter({ config, state }: { config: AppConfig; state: AppState }) {
   const txs = state.transactions;
@@ -35,6 +36,7 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
             <div><b>{state.events.length}</b><span>agent events</span></div>
           </div>
         </div>
+        <HeroArt />
       </section>
 
       <section className="kpis">

@@ -858,3 +858,63 @@ button { background: rgba(255, 255, 255, 0.1); border-color: rgba(200, 230, 255,
 .ring, .rings > div { background: rgba(255, 255, 255, 0.08); }
 .hero-stats b { background: linear-gradient(90deg, #ffffff, #9ff6ff); -webkit-background-clip: text; background-clip: text; filter: drop-shadow(0 0 8px rgba(0, 229, 255, 0.9)); }
 .ev-time { color: #a9c8ef; }
+
+/* =====================================================================
+   White layer: white frosted cards, white active controls and white
+   line-art graphics (hero illustration, circuit traces).
+   ===================================================================== */
+.hero { grid-template-columns: 220px 1fr 320px; }
+.hero-art { width: 320px; height: 230px; overflow: visible; filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.35)); }
+.ha-card { animation: haFloat 6s ease-in-out infinite; transform-box: fill-box; }
+@keyframes haFloat { 50% { translate: 0 -5px; } }
+.ha-pulse path { stroke-dasharray: 14 120; animation: haPulse 1.8s linear infinite; }
+@keyframes haPulse { from { stroke-dashoffset: 134; } to { stroke-dashoffset: 0; } }
+.ha-tag { animation: haTag 6s ease-in-out infinite; }
+@keyframes haTag { 0%, 100% { opacity: 0.75; } 50% { opacity: 1; } }
+@media (max-width: 1200px) { .hero { grid-template-columns: 220px 1fr; } .hero-art { display: none; } }
+
+/* circuit traces drifting behind everything */
+.circuitry {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0.16;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' viewBox='0 0 240 240' fill='none' stroke='%23fff' stroke-width='1.2'%3E%3Cpath d='M0 40h60l20 20h60M140 60v50l20 20h80M30 0v90l30 30v120M200 0v30l-30 30M90 240v-60l30-30h50l20-20V90M240 190h-40l-20 20H130'/%3E%3Cg fill='%23fff' stroke='none'%3E%3Ccircle cx='60' cy='40' r='3'/%3E%3Ccircle cx='140' cy='60' r='3'/%3E%3Ccircle cx='160' cy='130' r='3'/%3E%3Ccircle cx='60' cy='120' r='3'/%3E%3Ccircle cx='170' cy='60' r='3'/%3E%3Ccircle cx='120' cy='150' r='3'/%3E%3Ccircle cx='190' cy='130' r='3'/%3E%3Ccircle cx='200' cy='190' r='3'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 240px 240px;
+  mask-image: linear-gradient(90deg, #000 0%, transparent 22%, transparent 78%, #000 100%);
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, transparent 22%, transparent 78%, #000 100%);
+  animation: circuitDrift 60s linear infinite;
+}
+@keyframes circuitDrift { to { background-position: 240px 240px; } }
+
+/* white frosted KPI cards */
+.kpi {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(232, 243, 255, 0.9)) padding-box,
+    conic-gradient(from var(--spin), #00e5ff, #ffffff, #1a8cff, #8b5cff, #ff3d9a, #ffd23f, #00e5ff) border-box !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 0 40px -8px rgba(255, 255, 255, 0.75), 0 22px 44px -24px rgba(0, 30, 90, 0.8) !important;
+}
+.kpi .kpi-label { color: #2a5ea8; text-shadow: none; }
+.kpi .kpi-sub { color: #5476a3; }
+.kpi .kpi-value { background: linear-gradient(90deg, #003087, #0070e0); -webkit-background-clip: text; background-clip: text; color: transparent; filter: none; }
+.kpi-green .kpi-value { background: linear-gradient(90deg, #008a5a, #00c27a); -webkit-background-clip: text; background-clip: text; }
+.kpi-amber .kpi-value { background: linear-gradient(90deg, #c26a00, #f2a100); -webkit-background-clip: text; background-clip: text; }
+.kpi-red .kpi-value { background: linear-gradient(90deg, #c4003e, #ff3d7a); -webkit-background-clip: text; background-clip: text; }
+.kpi .spark { filter: saturate(1.4) brightness(0.85); }
+
+/* white stat tiles on the globe */
+.globe-stats div { background: rgba(255, 255, 255, 0.92) !important; border-color: #fff !important; box-shadow: 0 0 20px -8px rgba(255, 255, 255, 0.8); }
+.globe-stats b { color: #003087; }
+.globe-stats span { color: #4a6c99; }
+
+/* white active controls */
+.tabs button.on, .autonomy button.on {
+  background: #fff !important; color: #003087 !important; text-shadow: none !important;
+  box-shadow: 0 0 24px -2px rgba(255, 255, 255, 0.9), 0 0 48px -14px rgba(0, 229, 255, 0.9) !important;
+}
+.tabs button.on .badge { background: #ff3d7a; color: #fff; }
+.tm-core { background: #fff !important; color: #003087 !important; text-shadow: none !important; }
+.pill { border-color: rgba(255, 255, 255, 0.75) !important; background: rgba(255, 255, 255, 0.14) !important; color: #fff !important; }
+.demo-btn { border-color: #fff !important; background: rgba(255, 255, 255, 0.18) !important; box-shadow: 0 0 24px -6px rgba(255, 255, 255, 0.9) !important; }
+.panel::after { --c: #ffffff; filter: drop-shadow(0 0 6px #ffffff); }
+.panel h2 { color: #fff; }
+.panel h2::before { background: none; color: #fff; -webkit-text-fill-color: #fff; filter: drop-shadow(0 0 6px #fff); }
+html[data-theme] .tabs button.on, html[data-theme] .autonomy button.on { background: var(--t-tab) !important; color: var(--t-tab-text) !important; }
+@media (prefers-reduced-motion: reduce) { .circuitry, .ha-card, .ha-pulse path, .ha-tag { animation: none; } }

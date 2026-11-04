@@ -38,6 +38,7 @@ export function App() {
     <div className="shell">
       <Backdrop />
       <div className="lightbeams" aria-hidden />
+      <div className="circuitry" aria-hidden />
       <header className="topbar">
         <div className="brand">
           <span className="logo" aria-hidden>
