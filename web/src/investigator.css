@@ -1,0 +1,83 @@
+/* Autonomous Investigator. Uses only the shared theme tokens so it follows every theme. */
+.inv { display: grid; gap: 14px; }
+.inv-intro { display: grid; grid-template-columns: 1fr auto auto; gap: 20px; align-items: center; }
+.inv-intro h1 { margin: 0 0 6px; font-size: 22px; }
+.inv-intro p { margin: 0; max-width: 760px; }
+.inv-stats { display: flex; gap: 18px; }
+.inv-stats div { display: grid; text-align: right; }
+.inv-stats b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.inv-stats span { color: var(--muted); font-size: 12px; }
+.inv-err { color: var(--red); }
+.inv-grid { display: grid; grid-template-columns: 300px 1fr; gap: 14px; align-items: start; }
+.inv-list { display: grid; gap: 6px; }
+.inv-list-h { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 6px 0 2px; }
+.inv-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: var(--text); text-align: left; font: inherit; }
+.inv-row button { padding: 5px 10px; font-size: 12px; }
+.inv-case-row { cursor: pointer; width: 100%; }
+.inv-case-row.on { border-color: var(--accent, var(--blue)); box-shadow: 0 0 0 1px var(--accent, var(--blue)) inset; }
+.inv-score { font-size: 11px; padding: 1px 6px; border-radius: 6px; margin-left: 4px; font-family: var(--mono, monospace); }
+.inv-score.sh { color: var(--red); background: color-mix(in srgb, var(--red) 15%, transparent); }
+.inv-score.sm { color: var(--amber, #f5b941); background: color-mix(in srgb, var(--amber, #f5b941) 15%, transparent); }
+.inv-tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+
+.inv-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.inv-head h2 { margin: 2px 0 0; font-size: 18px; }
+.inv-verdict { display: grid; text-align: right; padding: 8px 14px; border-radius: 10px; border: 1px solid currentColor; min-width: 150px; }
+.inv-verdict b { font-size: 16px; }
+.inv-verdict span { font-size: 12px; opacity: 0.85; }
+.inv-v-fraud { color: var(--red); background: color-mix(in srgb, var(--red) 10%, transparent); }
+.inv-v-legitimate { color: var(--green); background: color-mix(in srgb, var(--green) 10%, transparent); }
+.inv-v-unsure { color: var(--amber, #f5b941); background: color-mix(in srgb, var(--amber, #f5b941) 10%, transparent); }
+.inv-v-running { color: var(--accent, var(--blue)); }
+.inv-progress { height: 3px; border-radius: 3px; background: var(--line); margin: 12px 0; overflow: hidden; }
+.inv-progress i { display: block; height: 100%; background: var(--accent, var(--blue)); transition: width 0.4s ease; }
+
+.inv-why { border: 1px solid var(--line); border-left: 3px solid var(--accent, var(--blue)); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; }
+.inv-why-h { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.inv-why p { margin: 4px 0 0; }
+.inv-headline { font-weight: 600; }
+
+.inv-body { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 16px; }
+.inv-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; position: relative; }
+.inv-step { display: grid; grid-template-columns: 22px 1fr; gap: 10px; padding: 8px 6px; border-radius: 8px; transition: background 0.3s; }
+.inv-s-pending { opacity: 0.45; }
+.inv-s-running { background: color-mix(in srgb, var(--accent, var(--blue)) 8%, transparent); }
+.inv-sum { margin-top: 2px; }
+.inv-find { margin: 4px 0 0; padding-left: 16px; color: var(--muted); font-size: 12.5px; }
+.inv-find li { margin: 1px 0; }
+.inv-ic { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--line); display: inline-grid; place-items: center; font-size: 11px; font-weight: 700; margin-top: 1px; }
+.inv-ic-done { border-color: var(--green); color: var(--green); background: color-mix(in srgb, var(--green) 15%, transparent); }
+.inv-ic-fail { border-color: var(--red); color: var(--red); }
+.inv-ic-run { border-color: var(--accent, var(--blue)); border-top-color: transparent; animation: inv-spin 0.8s linear infinite; }
+@keyframes inv-spin { to { transform: rotate(360deg); } }
+
+.inv-side { display: grid; gap: 12px; align-content: start; }
+.inv-map { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 10px; display: block; }
+.inv-map-empty { display: grid; place-items: center; aspect-ratio: 440 / 230; }
+.inv-sphere { fill: color-mix(in srgb, var(--accent, var(--blue)) 5%, transparent); stroke: var(--line); }
+.inv-land { fill: color-mix(in srgb, var(--muted) 28%, transparent); }
+.inv-arc { fill: none; stroke: var(--red); stroke-width: 1.8; stroke-dasharray: 5 4; animation: inv-dash 1.2s linear infinite; }
+@keyframes inv-dash { to { stroke-dashoffset: -18; } }
+.inv-ring-dot { fill: color-mix(in srgb, var(--red) 22%, transparent); stroke: var(--red); stroke-opacity: 0.5; }
+.inv-pt { stroke: var(--panel); stroke-width: 1.5; }
+.inv-pt-account { fill: var(--green); }
+.inv-pt-ip { fill: var(--amber, #f5b941); }
+.inv-pt-ship { fill: var(--red); }
+.inv-pt-label { font-size: 10px; fill: var(--text); paint-order: stroke; stroke: var(--panel); stroke-width: 3px; }
+.inv-ring, .inv-actions { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; }
+.inv-act { display: flex; gap: 8px; align-items: center; }
+.inv-act .pill { text-transform: capitalize; font-size: 11px; }
+.inv-a-executed { color: var(--green); border-color: var(--green); }
+.inv-a-waiting { color: var(--amber, #f5b941); border-color: var(--amber, #f5b941); }
+.inv-a-failed { color: var(--red); border-color: var(--red); }
+.badge-live { background: var(--red); color: #fff; animation: inv-blink 1.2s ease-in-out infinite; }
+@keyframes inv-blink { 50% { opacity: 0.45; } }
+
+@media (max-width: 1200px) { .inv-body { grid-template-columns: 1fr; } }
+@media (max-width: 900px) {
+  .inv-grid, .inv-intro { grid-template-columns: 1fr; }
+  .inv-stats div { text-align: left; }
+  .inv-head { flex-direction: column; }
+  .inv-verdict { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) { .inv-ic-run, .inv-arc, .badge-live { animation: none; } }

@@ -121,4 +121,21 @@ export interface AppState {
   approvals: Approval[];
   events: AgentEvent[];
   autonomy: Autonomy;
+  investigations?: Investigation[];
+}
+
+export interface Investigation {
+  id: string;
+  transactionId: string;
+  startedAt: string;
+  finishedAt?: string;
+  status: "running" | "done" | "failed";
+  by: "ai" | "rules-engine";
+  steps: { key: string; title: string; tool: string; status: "pending" | "running" | "done" | "failed"; summary?: string; findings: string[]; ms?: number }[];
+  trail?: { role: "account" | "ip" | "ship"; country: string }[];
+  ring?: { id: string; accounts: string[]; orders: number; orderIds: string[]; exposure: number; shared: string[]; countries: string[] };
+  score?: number;
+  verdict?: { verdict: "fraud" | "legitimate" | "unsure"; confidence: number; headline: string; narrative: string; evidence: string[] };
+  actions: { label: string; status: "executed" | "waiting" | "skipped" | "failed"; detail: string; approvalId?: string }[];
+  error?: string;
 }

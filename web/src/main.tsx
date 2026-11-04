@@ -4,6 +4,7 @@ import { App } from "./App";
 import "./styles.css";
 import "./themes.css";
 import "./pro.css";
+import "./investigator.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
