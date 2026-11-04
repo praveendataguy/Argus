@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ago, api, usd } from "../api";
 import { approve, type PasskeyStatus } from "../security";
 import type { AgentEvent, AppConfig, AppState, Approval } from "../types";
+import { ThreatGlobePanel } from "./ThreatGlobe";
 
 export function CommandCenter({ config, state }: { config: AppConfig; state: AppState }) {
   const txs = state.transactions;
@@ -43,12 +44,15 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
         <Kpi label="Awaiting you" value={String(pending.length)} sub={`auto-approve ≤ ${usd(config.autoApproveLimit)} in Guarded`} tone={pending.length ? "red" : undefined} spark={cumulative(state.approvals.map((a) => a.createdAt))} />
       </section>
 
+      <ThreatGlobePanel txs={txs} />
+
       <section className="sim">
         <span className="sim-label">Live traffic</span>
         <button onClick={() => api("/simulate/normal", {})}>＋ Normal order</button>
         <button onClick={() => api("/simulate/card-testing", {})}>⚡ Card-testing attack</button>
         <button onClick={() => api("/simulate/account-takeover", {})}>🕵️ Account takeover</button>
         <button onClick={() => api("/simulate/reseller", {})}>📦 Bulk reseller</button>
+        <button className="storm-mini" onClick={() => api("/simulate/storm", { size: 14 }).catch(() => undefined)}>🌪️ Global storm</button>
         <span className="spacer" />
         <button className="primary" disabled={!unscored} onClick={() => api("/transactions/analyse-unscored", {})}>
           Run risk sweep {unscored ? `(${unscored})` : ""}

@@ -20,6 +20,14 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 | **Tribunal** ⚖️ (counsel, advocate, judge) | Disputes | Adversarial debate with an independent ruling that must flag unsupported claims | Disputes v1 |
 | **ML model** 📈 | Every order, every war-game wave | Explainable second opinion, retrained after each round | — |
 
+### 🎬 One-click live demo
+
+The **▶ Live demo** button in the header runs a narrated, hands-free tour of everything Argus does in about two minutes. It launches a global attack storm, lets Risk Watch intercept it, hunts a fraud ring, plays a war-game round, hijacks an AI shopper with a poisoned page, convenes the dispute tribunal and re-verifies the audit chain. Captions appear on screen and the browser's own voice reads them aloud. Everything it triggers is real and goes through the same APIs as the buttons. Press → to skip a step, M to mute and Esc to stop.
+
+### 🌍 Live threat globe
+
+The Command Center has a 3D dot-matrix globe (Natural Earth land, rendered on canvas). Every PayPal capture flies from the buyer's real IP country to the shipping destination. Honest orders stay local and green, while attacks cross oceans in red to freight forwarders and reshippers. When Argus holds or cancels one, a shield burst marks the interception. Beside it are a DEFCON-style **threat level** for the last 15 minutes, the **hot corridors** (IP country → ship country) ranked by risk, and a **🌪️ global attack storm** button. The storm fires a burst of honest buyers from eight countries mixed with attacks from seven fraud hubs. Each payment is triaged in milliseconds by an edge pre-screen on the deterministic signal engine, and then Risk Watch reviews each one in full and has the final word. You can also say "launch an attack storm" to the voice control.
+
 ### 🕸️ Fraud ring graph
 
 Organised fraud spreads small, normal-looking orders across many fresh accounts. Argus links every account through the **device fingerprints, IP /24 ranges and normalised shipping addresses** it used (so "41 Larkin Street #3" and "41 Larkin St Apt 3" match). It runs union-find over the graph to find connected groups. The **Ring Hunter** agent investigates each ring and either clears it as a shared household or office, or holds every order in it and queues them for cancellation. The view is a live force-directed graph.
