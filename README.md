@@ -8,6 +8,12 @@ Small online sellers lose money in three places: fraud they don't catch before s
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 
+## For judges: try it in two minutes
+
+- **Hosted demo:** _link added before submission_ (Render free tier, so the first load can take up to a minute while it wakes).
+- **Run it yourself:** `git clone https://github.com/praveendataguy/argus && cd argus && npm install && npm run dev`, then open http://localhost:5173. No keys are needed: without them Argus uses a built-in PayPal simulator and an offline rules engine, and every feature still works. Add a free Groq key and PayPal sandbox keys to `.env` for live AI and real sandbox payments (see [Run it locally](#run-it-locally)).
+- **Then:** press **▶ Live demo** in the header for a narrated tour, or open the **Investigator** tab and press **Investigate suspicious** to watch Argus work fraud cases on its own.
+
 | Agent | Watches | Does | PayPal APIs |
 |---|---|---|---|
 | **Risk Watch** 🛡️ | Every captured payment | Scores fraud risk from deterministic signals plus reasoning, then allows, flags, holds or cancels and refunds | Orders v2, Payments v2 (refunds), Webhooks |
@@ -16,6 +22,7 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 | **Argus Copilot** 💬 | The merchant | Answers questions and carries out instructions ("refund $20 on TX-1039", "pay our affiliate $40") | All of the above, plus Payouts v1 |
 | **Ring Hunter** 🕸️ | Linked-account clusters | Decides fraud ring or benign household, holds and cancels ring orders | Payments v2 (refunds) |
 | **Red team / Blue team** 🗡️🛡️ | The war game | Red invents attacks, blue writes and backtests new detection rules | (Argus scoring engine) |
+| **Investigator** 🕵️ | Every held or high-risk payment | Works the whole case on its own (order, history, signals, identity network, geography), reaches a verdict with a plain-English reason, then freezes rings, cancels, or releases | Orders v2, Payments v2 (refunds) |
 | **Intent judge** 🧱 | Payments requested by other AI agents | Independently judges each payment against the owner's mandate | Payouts v1 |
 | **Tribunal** ⚖️ (counsel, advocate, judge) | Disputes | Adversarial debate with an independent ruling that must flag unsupported claims | Disputes v1 |
 | **ML model** 📈 | Every order, every war-game wave | Explainable second opinion, retrained after each round | — |
@@ -169,7 +176,7 @@ A `render.yaml` blueprint is included: on Render, choose **New → Blueprint**, 
 
 ## AI tools used
 
-- **Groq (`openai/gpt-oss-120b`, free tier)** is the default model provider. Every agent, the intent judge and the tribunal run on it through OpenAI-compatible function calling and JSON-mode structured output. Its reasoning is shown live in the dashboard.
+- **Groq (`openai/gpt-oss-120b`, free tier)** is the default model provider. Every agent, the investigator's verdicts, the intent judge and the tribunal run on it through OpenAI-compatible function calling and JSON-mode structured output. Its reasoning is shown live in the dashboard.
 - **Claude (Anthropic API)** is the alternative provider. It is used when `ANTHROPIC_API_KEY` is set, through the Anthropic TypeScript SDK's tool runner with adaptive thinking.
 - **In-process ML**: a logistic-regression fraud model trained and retrained in the app, with exact per-feature attributions.
 - **Model Context Protocol** (`@modelcontextprotocol/sdk`) exposes the agent payment firewall to any MCP client.
