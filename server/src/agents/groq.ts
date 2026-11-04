@@ -27,6 +27,9 @@ interface ChatResponse {
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
+/** The model produced a tool call whose arguments failed Groq's schema validation. */
+export class GroqToolCallError extends Error {}
+
 /** Parses Groq durations such as "7.55s", "1m2.5s" or "450ms" into milliseconds. */
 function parseDuration(v: string | null | undefined): number | null {
   if (!v) return null;
@@ -86,7 +89,17 @@ async function groqChatNow(body: { messages: ChatMessage[]; tools?: ChatTool[]; 
       notBefore = Math.max(notBefore, Date.now() + wait);
       continue;
     }
-    if (!res.ok) throw new Error(`Groq ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    if (!res.ok) {
+      const text = await res.text();
+      // Groq validates tool arguments server-side and rejects the whole turn when the
+      // model leaves out a required field. That is recoverable: tell the model and retry.
+      if (res.status === 400 && /tool_use_failed|tool call validation failed|json_validate_failed/i.test(text)) {
+        let message = text;
+        try { message = (JSON.parse(text) as { error?: { message?: string } }).error?.message ?? text; } catch { /* keep raw text */ }
+        throw new GroqToolCallError(message.slice(0, 600));
+      }
+      throw new Error(`Groq ${res.status}: ${text.slice(0, 300)}`);
+    }
     return (await res.json()) as ChatResponse;
   }
 }
@@ -101,7 +114,14 @@ export async function groqStructured<T extends z.ZodType>(system: string, user: 
     { role: "user", content: user },
   ];
   for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await groqChat({ messages, json: true });
+    let res: ChatResponse;
+    try {
+      res = await groqChat({ messages, json: true });
+    } catch (err) {
+      if (!(err instanceof GroqToolCallError)) throw err;
+      messages.push({ role: "user", content: `Your last reply was not valid JSON (${err.message.slice(0, 200)}). Reply with only the JSON object.` });
+      continue;
+    }
     onUsage(usageOf(res));
     const text = res.choices[0]?.message.content ?? "";
     try {

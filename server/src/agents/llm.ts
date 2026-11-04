@@ -6,7 +6,7 @@ import type { z } from "zod";
 import { config } from "../config.js";
 import { endRun, recordTool, recordUsage, startRun } from "../observability.js";
 import { newId, store } from "../store.js";
-import { groqChat, groqStructured, usageOf, type ChatMessage } from "./groq.js";
+import { GroqToolCallError, groqChat, groqStructured, usageOf, type ChatMessage } from "./groq.js";
 
 export const client = config.ai.provider === "anthropic" ? new Anthropic() : null;
 /** True when any model provider is configured (Claude or Groq). */
@@ -125,6 +125,37 @@ export async function runAgent(spec: AgentSpec, task: string): Promise<{ runId: 
   return { runId, text };
 }
 
+/**
+ * Prepares a tool's JSON Schema for Groq. Open models fill long arrays of objects
+ * unreliably, and Groq rejects the whole turn over any nested mismatch, so:
+ * $ref definitions are inlined (gpt-oss reads an inline schema far better), and
+ * nested required/additionalProperties are dropped. The tool's zod schema still
+ * validates locally and its error goes back to the model as the tool result,
+ * naming exactly which field to fix.
+ */
+function groqSchema(schema: unknown): unknown {
+  const defs = ((schema as { $defs?: Record<string, unknown> })?.$defs ?? {}) as Record<string, unknown>;
+  const walk = (node: unknown, depth: number, seen: Set<string>): unknown => {
+    if (Array.isArray(node)) return node.map((n) => walk(n, depth, seen));
+    if (!node || typeof node !== "object") return node;
+    const ref = (node as { $ref?: string }).$ref;
+    if (typeof ref === "string" && ref.startsWith("#/$defs/")) {
+      const name = ref.slice("#/$defs/".length);
+      if (!seen.has(name) && defs[name]) return walk(defs[name], depth, new Set(seen).add(name));
+    }
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(node)) {
+      if (k === "$defs" || k === "$schema") continue;
+      if (depth > 0 && (k === "required" || k === "additionalProperties")) continue;
+      out[k] = k === "properties" && v && typeof v === "object"
+        ? Object.fromEntries(Object.entries(v).map(([pk, pv]) => [pk, walk(pv, depth + 1, seen)]))
+        : walk(v, depth, seen);
+    }
+    return out;
+  };
+  return walk(schema, 0, new Set());
+}
+
 /** The same agent loop on Groq: OpenAI-style function calling over the same tools. */
 async function runGroqAgent(spec: AgentSpec, task: string, ctx: ToolContext): Promise<{ runId: string; text: string }> {
   const { runId } = ctx;
@@ -133,13 +164,21 @@ async function runGroqAgent(spec: AgentSpec, task: string, ctx: ToolContext): Pr
     { role: "system", content: `${spec.system}\n\nUse the tools to act; never claim an action happened unless a tool result says so. When you are finished, reply with a short final answer and no tool call.` },
     { role: "user", content: task },
   ];
+  const chatTools = tools.map((t) => { const d = t as unknown as { name: string; description?: string; input_schema: unknown }; return { type: "function" as const, function: { name: d.name, description: d.description ?? "", parameters: groqSchema(d.input_schema) } }; });
   let text = "";
+  let repairs = 0;
   try {
     for (let step = 0; step < 12; step++) {
-      const res = await groqChat({
-        messages,
-        tools: tools.map((t) => { const d = t as unknown as { name: string; description?: string; input_schema: unknown }; return { type: "function" as const, function: { name: d.name, description: d.description ?? "", parameters: d.input_schema } }; }),
-      });
+      let res: Awaited<ReturnType<typeof groqChat>>;
+      try {
+        res = await groqChat({ messages, tools: chatTools, maxTokens: 8000 });
+      } catch (err) {
+        if (!(err instanceof GroqToolCallError) || repairs >= 3) throw err;
+        repairs++;
+        store.log({ agent: spec.name, kind: "thinking", runId, message: `Tool call rejected by schema validation, retrying: ${err.message.slice(0, 200)}` });
+        messages.push({ role: "user", content: `Your last tool call was rejected and did not run: ${err.message}\nCall the tool again, filling in every required field for every item, exactly as the tool's JSON schema specifies.` });
+        continue;
+      }
       recordUsage(runId, usageOf(res));
       const msg = res.choices[0]?.message;
       if (!msg) break;
