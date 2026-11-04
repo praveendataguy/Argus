@@ -13,10 +13,12 @@ import { TrustCenter } from "./views/TrustCenter";
 import { Voice } from "./Voice";
 import { DemoMode } from "./DemoMode";
 import { Telemetry } from "./Telemetry";
+import { ThemePicker } from "./ThemePicker";
 import { Backdrop } from "./Backdrop";
 import { WarGame } from "./views/WarGame";
+import { Investigator } from "./views/Investigator";
 
-const TABS = ["Command Center", "Transactions", "Fraud Rings", "War Game", "Agent Firewall", "Trust Center", "Disputes", "Billing", "Storefront", "Observability"] as const;
+const TABS = ["Command Center", "Investigator", "Transactions", "Fraud Rings", "War Game", "Agent Firewall", "Trust Center", "Disputes", "Billing", "Storefront", "Observability"] as const;
 type Tab = (typeof TABS)[number];
 
 const AUTONOMY: { value: Autonomy; label: string; hint: string }[] = [
@@ -71,6 +73,7 @@ export function App() {
           <span className={`dot ${connected ? "dot-on" : ""}`} title={connected ? "Live" : "Reconnecting"} />
         </div>
         <DemoMode go={(t) => setTab(t as Tab)} />
+        <ThemePicker />
         <Voice go={(t) => setTab(t as Tab)} aiOnline={config.aiOnline} />
         <div className="autonomy" role="radiogroup" aria-label="Agent autonomy">
           {AUTONOMY.map((a) => (
@@ -93,6 +96,7 @@ export function App() {
           <button key={t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>
             {t}
             {t === "Command Center" && pending > 0 && <span className="badge">{pending}</span>}
+            {t === "Investigator" && state.investigations?.some((c) => c.status === "running") && <span className="badge badge-live">live</span>}
             {t === "Disputes" && openDisputes > 0 && <span className="badge">{openDisputes}</span>}
           </button>
         ))}
@@ -100,6 +104,7 @@ export function App() {
 
       <main>
         {tab === "Command Center" && <CommandCenter config={config} state={state} />}
+        {tab === "Investigator" && <Investigator state={state} />}
         {tab === "Transactions" && <Transactions state={state} />}
         {tab === "Fraud Rings" && <Network state={state} />}
         {tab === "War Game" && <WarGame state={state} />}

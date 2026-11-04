@@ -53,6 +53,11 @@ async function handle(raw: string, go: (tab: string) => void, aiOnline: boolean)
     await api("/wargame/round", {});
     return "Red team wave launched. Watch the war game.";
   }
+  if (/investigat/.test(t)) {
+    go("Investigator");
+    const { queued } = await api<{ queued: string[] }>("/investigations/all", {});
+    return queued.length ? `Opening ${queued.length} case${queued.length > 1 ? "s" : ""}. Watch the investigator work.` : "Nothing suspicious is waiting for an investigation.";
+  }
   if (/storm|global attack/.test(t)) {
     go("Command Center");
     await api("/simulate/storm", { size: 14 });

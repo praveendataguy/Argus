@@ -14,6 +14,7 @@ import { attachAudit, audit, checkpoint, inclusionProof, snapshot } from "./obse
 import { describeRule, learnedRules } from "./rules.js";
 import { explain, modelState, train } from "./ml.js";
 import { conveneTribunal } from "./tribunal.js";
+import { investigate, investigateAll, listInvestigations } from "./investigator.js";
 import { CATCH_SCORE, game, playRound, resetGame, toggleRule } from "./wargame.js";
 import { catalog, merchant, productBySku } from "./catalog.js";
 import { config, paypalMode } from "./config.js";
@@ -57,6 +58,7 @@ app.get("/api/state", (_req, res) => {
     approvals: [...store.approvals.values()].reverse(),
     events: store.events.slice(-200),
     autonomy: store.autonomy,
+    investigations: listInvestigations(),
   });
 });
 
@@ -95,6 +97,22 @@ app.post("/api/transactions/analyse-unscored", (_req, res) => {
   // Sequential so the feed reads like an analyst working through a queue.
   background("Risk sweep", ids.reduce((p, id) => p.then(() => background(`Risk analysis ${id}`, analyseTransaction(id))), Promise.resolve<unknown>(null)));
   res.status(202).json({ queued: ids });
+});
+
+/* ---------------- Autonomous investigator ---------------- */
+
+app.get("/api/investigations", (_req, res) => res.json(listInvestigations()));
+
+app.post("/api/investigations/all", (_req, res) => {
+  res.status(202).json({ queued: investigateAll() });
+});
+
+app.post("/api/transactions/:id/investigate", (req, res) => {
+  try {
+    res.status(202).json(investigate(req.params.id));
+  } catch (err) {
+    res.status(409).json({ error: err instanceof Error ? err.message : String(err) });
+  }
 });
 
 app.post("/api/disputes/:id/analyse", (req, res) => {

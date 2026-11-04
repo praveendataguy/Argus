@@ -916,5 +916,6 @@ button { background: rgba(255, 255, 255, 0.1); border-color: rgba(200, 230, 255,
 .panel::after { --c: #ffffff; filter: drop-shadow(0 0 6px #ffffff); }
 .panel h2 { color: #fff; }
 .panel h2::before { background: none; color: #fff; -webkit-text-fill-color: #fff; filter: drop-shadow(0 0 6px #fff); }
-html[data-theme] .tabs button.on, html[data-theme] .autonomy button.on { background: var(--t-tab) !important; color: var(--t-tab-text) !important; }
+html[data-theme]:not([data-theme="pro"]) .tabs button.on, html[data-theme]:not([data-theme="pro"]) .autonomy button.on { background: var(--t-tab) !important; color: var(--t-tab-text) !important; }
 @media (prefers-reduced-motion: reduce) { .circuitry, .ha-card, .ha-pulse path, .ha-tag { animation: none; } }
+@media (max-width: 900px) { .hero { grid-template-columns: 1fr; } }

@@ -86,6 +86,8 @@ export function Globe({ txs }: { txs: Transaction[] }) {
     const flights: Flight[] = [];
     const bursts: Burst[] = [];
     let first = true;
+    let frames = 0;
+    let pal = { haloA: "", haloB: "", oceanA: "", oceanB: "", rim: "", grid: "", landA: "", landB: "" };
 
     const resize = () => {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -185,6 +187,12 @@ export function Globe({ txs }: { txs: Transaction[] }) {
       }
       first = false;
 
+      if (frames++ % 30 === 0) {
+        // Palette comes from CSS so each theme can restyle the globe.
+        const cs = getComputedStyle(canvas);
+        const v = (k: string, d: string) => cs.getPropertyValue(k).trim() || d;
+        pal = { haloA: v("--globe-halo-a", "rgba(0,229,255,0.42)"), haloB: v("--globe-halo-b", "rgba(139,92,255,0.18)"), oceanA: v("--globe-ocean-a", "#1456b8"), oceanB: v("--globe-ocean-b", "#031c4d"), rim: v("--globe-rim", "rgba(64,196,255,0.55)"), grid: v("--globe-grid", "rgba(64,196,255,0.08)"), landA: v("--globe-land-a", "90,230,255"), landB: v("--globe-land-b", "150,170,255") };
+      }
       ctx.clearRect(0, 0, w, h);
       const R = Math.min(w, h) * 0.44;
       const cx = w / 2;
@@ -192,24 +200,24 @@ export function Globe({ txs }: { txs: Transaction[] }) {
 
       // Atmosphere and ocean.
       const halo = ctx.createRadialGradient(cx, cy, R * 0.9, cx, cy, R * 1.35);
-      halo.addColorStop(0, "rgba(0,229,255,0.42)");
-      halo.addColorStop(0.4, "rgba(139,92,255,0.18)");
+      halo.addColorStop(0, pal.haloA);
+      halo.addColorStop(0.4, pal.haloB);
       halo.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = halo;
       ctx.fillRect(0, 0, w, h);
       const ocean = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
-      ocean.addColorStop(0, "#1456b8");
-      ocean.addColorStop(1, "#031c4d");
+      ocean.addColorStop(0, pal.oceanA);
+      ocean.addColorStop(1, pal.oceanB);
       ctx.beginPath();
       ctx.arc(cx, cy, R, 0, Math.PI * 2);
       ctx.fillStyle = ocean;
       ctx.fill();
-      ctx.strokeStyle = "rgba(64,196,255,0.55)";
+      ctx.strokeStyle = pal.rim;
       ctx.lineWidth = 1;
       ctx.stroke();
 
       // Graticule rings for depth.
-      ctx.strokeStyle = "rgba(64,196,255,0.08)";
+      ctx.strokeStyle = pal.grid;
       for (let lat = -60; lat <= 60; lat += 30) {
         ctx.beginPath();
         let pen = false;
@@ -226,7 +234,7 @@ export function Globe({ txs }: { txs: Transaction[] }) {
       for (const [lon, lat] of dots) {
         const q = project(lon, lat);
         if (q.z <= 0) continue;
-        ctx.fillStyle = `rgba(${q.x < cx ? "90,230,255" : "150,170,255"},${0.25 + q.z * 0.75})`;
+        ctx.fillStyle = `rgba(${q.x < cx ? pal.landA : pal.landB},${0.25 + q.z * 0.75})`;
         ctx.fillRect(q.x - 1, q.y - 1, 2, 2);
       }
 
