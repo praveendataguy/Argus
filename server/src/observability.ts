@@ -216,10 +216,12 @@ export interface RunTrace {
 }
 
 // USD per million tokens. Override with MODEL_PRICE_IN / MODEL_PRICE_OUT if you switch models.
+// Groq's free tier costs nothing, so its default price is 0.
+const FREE = config.ai.provider === "groq";
 const PRICE = {
-  input: Number(process.env.MODEL_PRICE_IN ?? 4),
-  output: Number(process.env.MODEL_PRICE_OUT ?? 20),
-  cacheRead: Number(process.env.MODEL_PRICE_CACHE_READ ?? 0.2),
+  input: Number(process.env.MODEL_PRICE_IN ?? (FREE ? 0 : 4)),
+  output: Number(process.env.MODEL_PRICE_OUT ?? (FREE ? 0 : 20)),
+  cacheRead: Number(process.env.MODEL_PRICE_CACHE_READ ?? (FREE ? 0 : 0.2)),
 };
 
 export const runs: RunTrace[] = [];
@@ -230,7 +232,7 @@ export function startRun(runId: string, agent: string, task: string, engine: Run
     runId,
     agent,
     engine,
-    model: engine === "ai" ? config.anthropic.model : "rules-engine",
+    model: engine === "ai" ? config.ai.model : "rules-engine",
     task: task.slice(0, 200),
     startedAt: new Date().toISOString(),
     steps: 0,

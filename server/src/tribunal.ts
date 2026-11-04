@@ -1,12 +1,9 @@
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 import { rejectApproval, requestAction } from "./actions.js";
-import { client } from "./agents/llm.js";
+import { aiEnabled, structured } from "./agents/llm.js";
 import { merchant } from "./catalog.js";
-import { config } from "./config.js";
-import { endRun, recordUsage, startRun } from "./observability.js";
 import { fulfillmentRecords } from "./seed.js";
-import { newId, store, type Dispute, type TribunalTurn } from "./store.js";
+import { store, type Dispute, type TribunalTurn } from "./store.js";
 
 /**
  * The AI tribunal: before Argus commits money on a dispute, two adversarial
@@ -48,26 +45,8 @@ const ROLES = {
   defender: { agent: "buyer-advocate", brief: "You are the buyer's advocate in a PayPal dispute. Argue that the merchant should ACCEPT the claim and refund. Be persuasive but never invent facts: cite only the case file." },
 } as const;
 
-async function parse<T extends z.ZodType>(agent: string, task: string, system: string, user: string, schema: T, effort: "low" | "medium" | "high" = "medium"): Promise<z.infer<T>> {
-  const runId = newId("RUN");
-  startRun(runId, agent, task);
-  try {
-    const res = await client!.messages.parse({
-      model: config.anthropic.model,
-      max_tokens: 4000,
-      output_config: { effort, format: zodOutputFormat(schema) },
-      system,
-      messages: [{ role: "user", content: user }],
-    });
-    recordUsage(runId, res.usage);
-    if (!res.parsed_output) throw new Error(res.stop_reason === "refusal" ? "declined" : "no structured output");
-    endRun(runId, "ok", JSON.stringify(res.parsed_output).slice(0, 300));
-    return res.parsed_output as z.infer<T>;
-  } catch (err) {
-    endRun(runId, "error", err instanceof Error ? err.message : String(err));
-    throw err;
-  }
-}
+const parse = <T extends z.ZodType>(agent: string, task: string, system: string, user: string, schema: T, effort: "low" | "medium" | "high" = "medium") =>
+  structured({ agent, task, system, user, schema, effort });
 
 function say(d: Dispute, turn: TribunalTurn) {
   d.tribunal!.transcript.push(turn);
@@ -132,7 +111,7 @@ export async function conveneTribunal(disputeId: string) {
   if (!d) throw new Error(`No dispute ${disputeId}`);
   if (running.has(d.id)) throw new Error("The tribunal is already sitting on this case");
   running.add(d.id);
-  const ai = Boolean(client);
+  const ai = aiEnabled;
   d.tribunal = { status: "sitting", by: ai ? "ai" : "rules-engine", transcript: [], at: new Date().toISOString() };
   store.upsertDispute(d);
   store.log({ agent: "chief-judge", kind: "info", message: `Tribunal convened on ${d.id} ($${d.amount.toFixed(2)})` });

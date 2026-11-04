@@ -132,7 +132,7 @@ export function Firewall({ config, state }: { config: AppConfig; state: AppState
                 {busy === s.id ? "Checking…" : s.label}
               </button>
             ))}
-            <button className="primary" disabled={busy !== null || !config.aiOnline} onClick={() => run("live", "/firewall/live-agent")} title={config.aiOnline ? "" : "Needs ANTHROPIC_API_KEY"}>
+            <button className="primary" disabled={busy !== null || !config.aiOnline} onClick={() => run("live", "/firewall/live-agent")} title={config.aiOnline ? "" : "Needs GROQ_API_KEY"}>
               🧪 Run a live Claude agent on a poisoned page
             </button>
           </div>

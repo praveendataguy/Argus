@@ -42,7 +42,7 @@ AI agents are starting to spend money, and a prompt injection on any web page th
 
 Every settled payment gets a **receipt signed by Argus** (amount, payee, PayPal reference, mandate hash, checks passed). Public keys are at `/.well-known/jwks.json`, so anyone can verify mandates and receipts offline.
 
-Payments that pass are settled with **PayPal Payouts**. Large ones wait for a human, and anything suspicious is blocked. The dashboard can also run a live Claude agent against a poisoned order page to show the firewall stopping it.
+Payments that pass are settled with **PayPal Payouts**. Large ones wait for a human, and anything suspicious is blocked. The dashboard can also run a live AI agent against a poisoned order page to show the firewall stopping it.
 
 Connect any MCP client:
 
@@ -94,7 +94,7 @@ Agents can't move money directly. They can only *request* an action, and the pol
  PayPal webhooks ─────────────────────────────────────────┤
                                                            ▼
                                    ┌──────────── Express server ────────────┐
-                                   │  Agents (Claude tool use)              │
+                                   │  Agents (Groq / Claude tool use)       │
                                    │   risk · dispute · billing · copilot   │
                                    │        │ tools                         │
                                    │        ▼                               │
@@ -111,7 +111,7 @@ Agents can't move money directly. They can only *request* an action, and the pol
 
 - `server/src/paypal/rest.ts` is a typed PayPal REST client covering OAuth, Orders, Payments, Invoicing, Disputes, Payouts and webhook signature verification.
 - `server/src/paypal/simulator.ts` mirrors the same interface in memory, so the project runs end to end with no credentials.
-- `server/src/agents/` holds the agent definitions and tools. They use the Anthropic SDK tool runner with adaptive thinking. The model's reasoning summaries and every tool call stream live into the dashboard feed.
+- `server/src/agents/` holds the agent definitions and tools. On Claude they use the Anthropic SDK tool runner with adaptive thinking; on Groq the same tools run through OpenAI-style function calling (`agents/groq.ts`). The model's reasoning summaries and every tool call stream live into the dashboard feed.
 - `server/src/risk.ts` is the deterministic signal engine: velocity, account age, IP, account and shipping country mismatch, disposable email, amount outliers, bulk quantity, account-takeover patterns and prior disputes. The AI reasons over these signals rather than guessing. When no API key is set, the same signals drive an offline rules engine.
 
 ## Run it locally
@@ -121,7 +121,7 @@ Requires Node 20+.
 ```bash
 git clone <this repo> && cd argus
 npm install
-cp .env.example .env      # optional: add PayPal sandbox + Anthropic keys
+cp .env.example .env      # optional: add PayPal sandbox keys and a free Groq key
 npm run dev               # API on :8787, dashboard on http://localhost:5173
 ```
 
@@ -129,9 +129,12 @@ The app runs in three configurations:
 
 | `.env` | PayPal | AI |
 |---|---|---|
-| nothing | built-in simulator | offline rules engine |
-| `ANTHROPIC_API_KEY` | built-in simulator | Claude agents |
-| both PayPal sandbox keys + `ANTHROPIC_API_KEY` | **real PayPal sandbox** | Claude agents |
+| nothing | built-in simulator | offline rules engine + ML model |
+| `GROQ_API_KEY` (free) | built-in simulator | agents on Groq (`openai/gpt-oss-120b`) |
+| `ANTHROPIC_API_KEY` | built-in simulator | agents on Claude |
+| both PayPal sandbox keys + an AI key | **real PayPal sandbox** | AI agents |
+
+If both AI keys are set, Claude is used. Change the Groq model with `GROQ_MODEL`. A free Groq key is available at [console.groq.com/keys](https://console.groq.com/keys).
 
 Production build (serves the dashboard from the API server):
 
@@ -154,7 +157,9 @@ A `render.yaml` blueprint is included: on Render, choose **New → Blueprint**, 
 
 ## AI tools used
 
-- **Claude (Anthropic API, `claude-opus-5-5`)** powers every agent through the Anthropic TypeScript SDK's tool runner. It uses adaptive thinking with summarized reasoning, which is shown live in the dashboard, and server-side refusal fallbacks.
+- **Groq (`openai/gpt-oss-120b`, free tier)** is the default model provider. Every agent, the intent judge and the tribunal run on it through OpenAI-compatible function calling and JSON-mode structured output. Its reasoning is shown live in the dashboard.
+- **Claude (Anthropic API)** is the alternative provider. It is used when `ANTHROPIC_API_KEY` is set, through the Anthropic TypeScript SDK's tool runner with adaptive thinking.
+- **In-process ML**: a logistic-regression fraud model trained and retrained in the app, with exact per-feature attributions.
 - **Model Context Protocol** (`@modelcontextprotocol/sdk`) exposes the agent payment firewall to any MCP client.
 - **Claude Code** was used as a pair programmer to build this project.
 

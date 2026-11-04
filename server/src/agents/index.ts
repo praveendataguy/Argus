@@ -5,7 +5,7 @@ import { buildGraph } from "../graph.js";
 import { computeSignals, heuristicScore, levelFor } from "../risk.js";
 import { fulfillmentRecords } from "../seed.js";
 import { store } from "../store.js";
-import { client, runAgent, runHeuristic, type AgentSpec } from "./llm.js";
+import { aiEnabled, runAgent, runHeuristic, type AgentSpec } from "./llm.js";
 import * as T from "./tools.js";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -71,7 +71,7 @@ Call act_on_ring exactly once. Then give the merchant a short plain-English brie
   tools: [T.getFraudRings, T.getBuyerProfile, T.getTransaction, T.actOnRing],
 };
 
-export const aiOnline = () => client !== null;
+export const aiOnline = () => aiEnabled;
 
 // One analysis per transaction at a time, so a webhook and a button click don't race.
 const inFlight = new Map<string, Promise<unknown>>();
@@ -105,12 +105,12 @@ export function analyseRing(ringId: string) {
 }
 
 export async function draftInvoices(request: string) {
-  if (!aiOnline()) throw new Error("Invoice drafting from free text needs an Anthropic API key (set ANTHROPIC_API_KEY).");
+  if (!aiOnline()) throw new Error("Invoice drafting from free text needs an AI provider (set GROQ_API_KEY or ANTHROPIC_API_KEY).");
   return runAgent(billingAgent, request);
 }
 
 export async function askCopilot(question: string) {
-  if (!aiOnline()) throw new Error("The copilot needs an Anthropic API key (set ANTHROPIC_API_KEY).");
+  if (!aiOnline()) throw new Error("The copilot needs an AI provider (set GROQ_API_KEY or ANTHROPIC_API_KEY).");
   return runAgent(copilot, question);
 }
 

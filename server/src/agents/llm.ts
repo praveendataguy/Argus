@@ -1,12 +1,16 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { BetaRunnableTool } from "@anthropic-ai/sdk/lib/tools/BetaRunnableTool";
+import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { z } from "zod";
 import { config } from "../config.js";
 import { endRun, recordTool, recordUsage, startRun } from "../observability.js";
 import { newId, store } from "../store.js";
+import { groqChat, groqStructured, usageOf, type ChatMessage } from "./groq.js";
 
-export const client = config.anthropic.enabled ? new Anthropic() : null;
+export const client = config.ai.provider === "anthropic" ? new Anthropic() : null;
+/** True when any model provider is configured (Claude or Groq). */
+export const aiEnabled = config.ai.provider !== null;
 
 export interface ToolContext {
   agent: string;
@@ -76,14 +80,15 @@ export interface AgentSpec {
 
 /** Runs one agent to completion with Claude, streaming its reasoning and tool calls to the feed. */
 export async function runAgent(spec: AgentSpec, task: string): Promise<{ runId: string; text: string }> {
-  if (!client) throw new Error("No Anthropic credentials configured");
+  if (!aiEnabled) throw new Error("No AI provider configured (set GROQ_API_KEY or ANTHROPIC_API_KEY)");
   const runId = newId("RUN");
   const ctx: ToolContext = { agent: spec.name, runId };
   store.log({ agent: spec.name, kind: "info", runId, message: `Started: ${task.split("\n")[0].slice(0, 160)}` });
   startRun(runId, spec.name, task);
+  if (!client) return runGroqAgent(spec, task, ctx);
 
   const runner = client.beta.messages.toolRunner({
-    model: config.anthropic.model,
+    model: config.ai.model,
     max_tokens: 16000,
     max_iterations: 12,
     thinking: { type: "adaptive", display: "summarized" },
@@ -118,4 +123,85 @@ export async function runAgent(spec: AgentSpec, task: string): Promise<{ runId: 
   endRun(runId, status, text);
   if (text) store.log({ agent: spec.name, kind: "decision", runId, message: text.slice(0, 800) });
   return { runId, text };
+}
+
+/** The same agent loop on Groq: OpenAI-style function calling over the same tools. */
+async function runGroqAgent(spec: AgentSpec, task: string, ctx: ToolContext): Promise<{ runId: string; text: string }> {
+  const { runId } = ctx;
+  const tools = spec.tools.map((t) => t(ctx));
+  const messages: ChatMessage[] = [
+    { role: "system", content: `${spec.system}\n\nUse the tools to act; never claim an action happened unless a tool result says so. When you are finished, reply with a short final answer and no tool call.` },
+    { role: "user", content: task },
+  ];
+  let text = "";
+  try {
+    for (let step = 0; step < 12; step++) {
+      const res = await groqChat({
+        messages,
+        tools: tools.map((t) => { const d = t as unknown as { name: string; description?: string; input_schema: unknown }; return { type: "function" as const, function: { name: d.name, description: d.description ?? "", parameters: d.input_schema } }; }),
+      });
+      recordUsage(runId, usageOf(res));
+      const msg = res.choices[0]?.message;
+      if (!msg) break;
+      if (msg.reasoning?.trim()) store.log({ agent: spec.name, kind: "thinking", runId, message: msg.reasoning.trim().slice(0, 600) });
+      if (msg.content?.trim()) text = msg.content.trim();
+      if (!msg.tool_calls?.length) break;
+      messages.push({ role: "assistant", content: msg.content ?? "", tool_calls: msg.tool_calls });
+      for (const call of msg.tool_calls) {
+        const tool = tools.find((t) => t.name === call.function.name);
+        let output: string;
+        try {
+          if (!tool) throw new Error(`Unknown tool ${call.function.name}`);
+          const result = await tool.run(tool.parse(JSON.parse(call.function.arguments || "{}")));
+          output = typeof result === "string" ? result : JSON.stringify(result);
+        } catch (err) {
+          output = `ERROR: ${err instanceof Error ? err.message : String(err)}`;
+        }
+        messages.push({ role: "tool", tool_call_id: call.id, content: output });
+      }
+    }
+  } catch (err) {
+    endRun(runId, "error", err instanceof Error ? err.message : String(err));
+    throw err;
+  }
+  endRun(runId, "ok", text);
+  if (text) store.log({ agent: spec.name, kind: "decision", runId, message: text.slice(0, 800) });
+  return { runId, text };
+}
+
+/** One structured-output call (judge, tribunal), traced like an agent run, on whichever provider is configured. */
+export async function structured<T extends z.ZodType>(opts: {
+  agent: string;
+  task: string;
+  system: string;
+  user: string;
+  schema: T;
+  effort?: "low" | "medium" | "high";
+  maxTokens?: number;
+}): Promise<z.infer<T>> {
+  if (!aiEnabled) throw new Error("No AI provider configured");
+  const runId = newId("RUN");
+  startRun(runId, opts.agent, opts.task);
+  try {
+    let out: z.infer<T>;
+    if (client) {
+      const res = await client.messages.parse({
+        model: config.ai.model,
+        max_tokens: opts.maxTokens ?? 4000,
+        output_config: { effort: opts.effort ?? "medium", format: zodOutputFormat(opts.schema) },
+        system: opts.system,
+        messages: [{ role: "user", content: opts.user }],
+      });
+      recordUsage(runId, res.usage);
+      if (!res.parsed_output) throw new Error(res.stop_reason === "refusal" ? "The model declined" : "No structured output");
+      out = res.parsed_output as z.infer<T>;
+    } else {
+      out = await groqStructured(opts.system, opts.user, opts.schema, (u) => recordUsage(runId, u));
+    }
+    endRun(runId, "ok", JSON.stringify(out).slice(0, 300));
+    return out;
+  } catch (err) {
+    endRun(runId, "error", err instanceof Error ? err.message : String(err));
+    throw err;
+  }
 }

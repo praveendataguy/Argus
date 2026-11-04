@@ -42,7 +42,7 @@ app.get("/api/config", (_req, res) => {
     paypalMode,
     paypalClientId: paypalMode === "sandbox" ? config.paypal.clientId : null,
     aiOnline: aiOnline(),
-    model: config.anthropic.model,
+    model: config.ai.model,
     autonomy: store.autonomy,
     autoApproveLimit: config.policy.autoApproveLimit,
   });
@@ -158,7 +158,7 @@ app.post("/api/firewall/scenario/:id", wrap(async (req, res) => {
 }));
 
 app.post("/api/firewall/live-agent", (_req, res) => {
-  if (!aiOnline()) return res.status(400).json({ error: "The live agent needs ANTHROPIC_API_KEY" });
+  if (!aiOnline()) return res.status(400).json({ error: "The live agent needs GROQ_API_KEY or ANTHROPIC_API_KEY" });
   background("Live shopping agent", runLiveShopper());
   res.status(202).json({ ok: true });
 });
@@ -367,5 +367,5 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
 app.listen(config.port, () => {
   console.log(`Argus on http://localhost:${config.port}`);
   console.log(`  PayPal: ${paypalMode}${paypalMode === "simulator" ? " (set PAYPAL_CLIENT_ID/SECRET for the real sandbox)" : ""}`);
-  console.log(`  AI: ${aiOnline() ? config.anthropic.model : "offline rules engine (set ANTHROPIC_API_KEY)"}`);
+  console.log(`  AI: ${aiOnline() ? config.ai.model : "offline rules engine (set GROQ_API_KEY or ANTHROPIC_API_KEY)"}`);
 });

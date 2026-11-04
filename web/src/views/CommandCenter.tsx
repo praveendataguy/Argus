@@ -306,7 +306,7 @@ function Copilot({ enabled }: { enabled: boolean }) {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder={enabled ? "Ask Argus or tell it what to do…" : "Copilot needs ANTHROPIC_API_KEY"}
+          placeholder={enabled ? "Ask Argus or tell it what to do…" : "Copilot needs GROQ_API_KEY"}
           disabled={!enabled || busy}
         />
         <button className="primary" disabled={!enabled || busy}>

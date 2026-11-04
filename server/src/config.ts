@@ -21,8 +21,14 @@ export const config = {
 
   anthropic: {
     enabled: Boolean(env.ANTHROPIC_API_KEY || env.ANTHROPIC_AUTH_TOKEN),
-    model: env.ARGUS_MODEL ?? "claude-opus-5-5",
   },
+
+  // Claude when an Anthropic key is set, otherwise Groq's free tier when GROQ_API_KEY is set, otherwise the rules engine.
+  ai: (() => {
+    const provider: "anthropic" | "groq" | null = env.ANTHROPIC_API_KEY || env.ANTHROPIC_AUTH_TOKEN ? "anthropic" : env.GROQ_API_KEY ? "groq" : null;
+    const model = provider === "groq" ? (env.GROQ_MODEL ?? "openai/gpt-oss-120b") : (env.ARGUS_MODEL ?? "claude-opus-5-5");
+    return { provider, model };
+  })(),
 
   policy: {
     // Money-moving actions at or below this amount run without a human when autonomy is "guarded".

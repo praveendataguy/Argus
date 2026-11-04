@@ -41,7 +41,7 @@ export function Billing({ config, state }: { config: AppConfig; state: AppState 
             ))}
           </div>
           <button className="primary" disabled={!config.aiOnline || busy || !text.trim()} onClick={submit}>
-            {busy ? "Drafting…" : config.aiOnline ? "Create PayPal invoice" : "Needs ANTHROPIC_API_KEY"}
+            {busy ? "Drafting…" : config.aiOnline ? "Create PayPal invoice" : "Needs GROQ_API_KEY"}
           </button>
         </div>
         {reply && <div className="answer">{reply}</div>}
