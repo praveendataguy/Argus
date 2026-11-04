@@ -66,6 +66,9 @@ export class PayPalRestGateway implements PayPalGateway {
           items: items.map((i) => ({ name: i.name, quantity: String(i.quantity), unit_amount: money(i.unitAmount, currency) })),
         },
       ],
+      // PAY_NOW makes PayPal's last button "Complete Purchase" instead of "Continue to Review Order",
+      // since this storefront has no review page of its own.
+      payment_source: { paypal: { experience_context: { user_action: "PAY_NOW", shipping_preference: "GET_FROM_FILE" } } },
     });
     return { id: order.id, approveUrl: order.links.find((l) => l.rel === "approve" || l.rel === "payer-action")?.href };
   }
