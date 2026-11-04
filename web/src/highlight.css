@@ -1,0 +1,76 @@
+/*
+ * Command Center spotlight (Daylight, the default look): makes the hero and the
+ * KPI row the brightest things on the page. Other themes are untouched.
+ */
+html:not([data-theme]) .tabs { flex-wrap: wrap; overflow: visible; scrollbar-width: none; }
+html:not([data-theme]) .tabs::-webkit-scrollbar { display: none; }
+
+html:not([data-theme]) .cc .hero {
+  position: relative;
+  overflow: hidden;
+  border-width: 2.5px;
+  padding: 26px 30px;
+  background:
+    radial-gradient(900px 300px at 30% -20%, rgba(255, 255, 255, 0.32), transparent 60%),
+    linear-gradient(135deg, rgba(0, 112, 224, 0.92), rgba(0, 48, 135, 0.94) 60%, rgba(64, 40, 160, 0.92)) padding-box,
+    conic-gradient(from var(--spin), #ffffff, #00e5ff, #ffd23f, #ff3d9a, #8b5cff, #ffffff) border-box;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.35),
+    0 0 60px -6px rgba(0, 229, 255, 0.85),
+    0 0 120px -20px rgba(255, 210, 63, 0.55),
+    0 30px 60px -30px rgba(0, 10, 40, 0.9);
+}
+/* a slow light sweep across the hero */
+html:not([data-theme]) .cc .hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.22) 48%, rgba(255, 255, 255, 0.05) 55%, transparent 65%);
+  transform: translateX(-100%);
+  animation: cc-sweep 5.5s ease-in-out infinite;
+}
+@keyframes cc-sweep { 0%, 15% { transform: translateX(-100%); } 60%, 100% { transform: translateX(100%); } }
+
+html:not([data-theme]) .cc .hero h1 { font-size: 38px; line-height: 1.1; filter: drop-shadow(0 0 22px rgba(255, 255, 255, 0.45)); }
+html:not([data-theme]) .cc .hero h1 em { font-size: 1.12em; animation: cc-gold 2.6s ease-in-out infinite; }
+@keyframes cc-gold {
+  50% { filter: drop-shadow(0 0 26px rgba(255, 210, 63, 1)) drop-shadow(0 0 6px rgba(255, 255, 255, 0.8)); }
+}
+html:not([data-theme]) .cc .hero p { color: rgba(255, 255, 255, 0.9); font-size: 16px; }
+
+/* hero stats as glowing glass chips */
+html:not([data-theme]) .cc .hero-stats { gap: 12px; margin-top: 18px; }
+html:not([data-theme]) .cc .hero-stats > div {
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 0 24px -8px rgba(0, 229, 255, 0.9);
+  backdrop-filter: blur(6px);
+}
+html:not([data-theme]) .cc .hero-stats b { font-size: 28px; }
+html:not([data-theme]) .cc .hero-stats span { color: rgba(255, 255, 255, 0.85); }
+
+/* KPI cards: brighter halo, lift on hover */
+html:not([data-theme]) .cc .kpi {
+  border-width: 2px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.6), 0 0 40px -8px rgba(0, 229, 255, 0.9), 0 20px 40px -24px rgba(0, 10, 40, 0.8);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+html:not([data-theme]) .cc .kpi:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0 0 1px #fff, 0 0 60px -6px rgba(0, 229, 255, 1), 0 0 90px -20px rgba(255, 210, 63, 0.8), 0 26px 50px -24px rgba(0, 10, 40, 0.8);
+}
+
+/* the active Command Center tab glows */
+html:not([data-theme]) .tabs button.on { box-shadow: 0 0 0 1px #fff, 0 0 26px -2px rgba(0, 229, 255, 0.95), 0 0 40px -10px rgba(255, 210, 63, 0.9); }
+
+@media (max-width: 900px) {
+  html:not([data-theme]) .cc .hero { padding: 18px; }
+  html:not([data-theme]) .cc .hero h1 { font-size: 26px; }
+  html:not([data-theme]) .cc .hero-stats b { font-size: 22px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-theme]) .cc .hero::after, html:not([data-theme]) .cc .hero h1 em { animation: none; }
+}

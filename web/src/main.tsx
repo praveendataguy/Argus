@@ -5,6 +5,7 @@ import "./styles.css";
 import "./themes.css";
 import "./pro.css";
 import "./investigator.css";
+import "./highlight.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
