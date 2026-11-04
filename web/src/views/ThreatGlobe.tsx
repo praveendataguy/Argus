@@ -43,10 +43,10 @@ function getLandDots() {
 
 /* ------------------------------------------------------------------ */
 
-const RED = "255,77,109";
+const RED = "255,61,154";
 const AMBER = "255,196,57";
-const GREEN = "46,229,157";
-const SKY = "92,200,255";
+const GREEN = "25,255,176";
+const SKY = "0,229,255";
 
 const colorFor = (t: Transaction) => {
   const s = t.risk?.score;
@@ -192,8 +192,8 @@ export function Globe({ txs }: { txs: Transaction[] }) {
 
       // Atmosphere and ocean.
       const halo = ctx.createRadialGradient(cx, cy, R * 0.9, cx, cy, R * 1.35);
-      halo.addColorStop(0, "rgba(0,156,222,0.28)");
-      halo.addColorStop(0.4, "rgba(0,112,224,0.12)");
+      halo.addColorStop(0, "rgba(0,229,255,0.42)");
+      halo.addColorStop(0.4, "rgba(139,92,255,0.18)");
       halo.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = halo;
       ctx.fillRect(0, 0, w, h);
@@ -226,7 +226,7 @@ export function Globe({ txs }: { txs: Transaction[] }) {
       for (const [lon, lat] of dots) {
         const q = project(lon, lat);
         if (q.z <= 0) continue;
-        ctx.fillStyle = `rgba(110,205,255,${0.18 + q.z * 0.68})`;
+        ctx.fillStyle = `rgba(${q.x < cx ? "90,230,255" : "150,170,255"},${0.25 + q.z * 0.75})`;
         ctx.fillRect(q.x - 1, q.y - 1, 2, 2);
       }
 
