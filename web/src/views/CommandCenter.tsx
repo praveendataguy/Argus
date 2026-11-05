@@ -87,12 +87,16 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
           ))}
         </section>
 
-        <section className="panel feed-panel">
-          <h2>
-            Agent activity <span className="live">● live</span>
-          </h2>
-          <Feed events={state.events} />
-        </section>
+        <div className="cc-side">
+          <section className="panel feed-panel">
+            <h2>
+              Agent activity <span className="live">● live</span>
+            </h2>
+            <Feed events={state.events} />
+          </section>
+          <RiskiestPayments txs={txs} />
+          <AgentTeam events={state.events} />
+        </div>
       </div>
     </div>
   );
@@ -335,6 +339,91 @@ const AGENT_ICON: Record<string, string> = {
   "intent-judge": "🔍",
   voice: "🎙️",
 };
+
+const ACTION_LABEL: Record<string, string> = { allow: "allowed", review: "review", hold: "held", refund: "refunded" };
+
+function RiskiestPayments({ txs }: { txs: AppState["transactions"] }) {
+  const top = txs
+    .filter((t) => t.risk)
+    .sort((a, b) => b.risk!.score - a.risk!.score || b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 6);
+  return (
+    <section className="panel side-panel">
+      <h2>Riskiest payments</h2>
+      {top.length === 0 && <p className="empty">Nothing scored yet. Run a risk sweep.</p>}
+      <div className="risk-list">
+        {top.map((t) => {
+          const score = t.risk!.score;
+          const tone = score >= 70 ? "red" : score >= 40 ? "amber" : "green";
+          return (
+            <div key={t.id} className="risk-row">
+              <span className={`risk-score risk-${tone}`}>{score}</span>
+              <div className="risk-main">
+                <div className="risk-top">
+                  <b>{t.id}</b>
+                  <span>{usd(t.amount)}</span>
+                </div>
+                <div className="risk-sub">
+                  {t.ipCountry} → {t.shipping.country} · {t.buyer.email}
+                </div>
+                <div className="risk-why">{t.risk!.reasons[0] ?? t.risk!.summary}</div>
+              </div>
+              <span className={`risk-act act-${t.status === "REFUNDED" ? "refund" : t.status === "HELD" ? "hold" : t.risk!.action}`}>
+                {t.status === "REFUNDED" ? "refunded" : t.status === "HELD" ? "held" : ACTION_LABEL[t.risk!.action]}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+const HIDDEN_AGENTS = new Set(["system", "paypal", "human", "voice"]);
+
+function AgentTeam({ events }: { events: AgentEvent[] }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(id);
+  }, []);
+  const byAgent = new Map<string, { count: number; last: AgentEvent; actions: number }>();
+  for (const e of events) {
+    if (HIDDEN_AGENTS.has(e.agent)) continue;
+    const cur = byAgent.get(e.agent) ?? { count: 0, last: e, actions: 0 };
+    cur.count++;
+    if (e.kind === "decision" || e.kind === "action") cur.actions++;
+    if (e.ts >= cur.last.ts) cur.last = e;
+    byAgent.set(e.agent, cur);
+  }
+  const agents = [...byAgent.entries()].sort((a, b) => b[1].last.ts.localeCompare(a[1].last.ts)).slice(0, 8);
+  return (
+    <section className="panel side-panel">
+      <h2>
+        Agent team <span className="muted small">{byAgent.size} on duty</span>
+      </h2>
+      {agents.length === 0 && <p className="empty">Agents will appear here as they work.</p>}
+      <div className="team-grid">
+        {agents.map(([name, a]) => {
+          const active = now - new Date(a.last.ts).getTime() < 60_000;
+          return (
+            <div key={name} className={`team-card ${active ? "team-active" : ""}`} title={a.last.message}>
+              <div className="team-head">
+                <span className="team-icon">{AGENT_ICON[name] ?? "🤖"}</span>
+                <b>{name}</b>
+                <span className={`team-dot ${active ? "on" : ""}`} aria-label={active ? "working" : "idle"} />
+              </div>
+              <div className="team-stats">
+                {a.count} event{a.count === 1 ? "" : "s"} · {a.actions} decision{a.actions === 1 ? "" : "s"}
+              </div>
+              <div className="team-last">{active ? "working now" : `last seen ${ago(a.last.ts)}`}</div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 
 function Feed({ events }: { events: AgentEvent[] }) {
   const ref = useRef<HTMLDivElement>(null);
