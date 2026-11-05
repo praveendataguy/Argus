@@ -121,6 +121,9 @@ a { color: #5cc8ff; }
 @keyframes fadein { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; } }
 
 .copilot { margin-top: 12px; }
+.copilot-panel { margin-top: 14px; }
+.copilot-panel .copilot { margin-top: 0; }
+.copilot-panel .copilot input { font-size: 15px; padding: 12px 14px; }
 .copilot form { display: flex; gap: 8px; }
 .answer { background: #1a160a; border: 1px solid #4a3a10; border-radius: 10px; padding: 10px 12px; margin: 10px 0; white-space: pre-wrap; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
