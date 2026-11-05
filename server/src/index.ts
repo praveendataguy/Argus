@@ -18,6 +18,7 @@ import { investigate, investigateAll, listInvestigations } from "./investigator.
 import { CATCH_SCORE, game, playRound, resetGame, toggleRule } from "./wargame.js";
 import { catalog, merchant, productBySku } from "./catalog.js";
 import { config, paypalMode } from "./config.js";
+import { knownPayees, payoutScenarios, runPayoutScenario, screenings } from "./payoutguard.js";
 import { paypal } from "./paypal/index.js";
 import { PayPalApiError } from "./paypal/rest.js";
 import { seedDemoData } from "./seed.js";
@@ -181,6 +182,22 @@ app.post("/api/firewall/live-agent", (_req, res) => {
   background("Live shopping agent", runLiveShopper());
   res.status(202).json({ ok: true });
 });
+
+/* ---------------- Payout guard (payment redirection) ---------------- */
+
+app.get("/api/payout-guard", (_req, res) => {
+  res.json({
+    payees: knownPayees,
+    screenings: screenings.slice(0, 30),
+    scenarios: Object.entries(payoutScenarios).map(([id, s]) => ({ id, label: s.label })),
+  });
+});
+
+app.post("/api/payout-guard/scenario/:id", wrap(async (req, res) => {
+  const a = await runPayoutScenario(String(req.params.id));
+  if (!a) return res.status(404).json({ error: "Unknown scenario" });
+  res.json(a);
+}));
 
 app.get("/.well-known/jwks.json", (_req, res) => res.json(jwks()));
 app.post("/api/credentials/verify", (req, res) => res.json(verifyToken(String(req.body?.token ?? ""))));

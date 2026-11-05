@@ -234,9 +234,14 @@ export const requestRefund = defineTool({
 
 export const requestPayout = defineTool({
   name: "request_payout",
-  description: "Send money to a person (supplier, affiliate, creator) with PayPal Payouts. Goes through the approval policy.",
-  inputSchema: z.object({ receiverEmail: z.string(), amount: z.number().positive(), note: z.string() }),
-  run: async ({ receiverEmail, amount, note }, ctx) => {
+  description: "Send money to a person (supplier, affiliate, creator) with PayPal Payouts. Goes through the approval policy and the payout guard, which checks the payee against the payee book.",
+  inputSchema: z.object({
+    receiverEmail: z.string(),
+    amount: z.number().positive(),
+    note: z.string(),
+    context: z.string().optional().describe("The email or message that asked for this payout, quoted verbatim, so the payout guard can check it"),
+  }),
+  run: async ({ receiverEmail, amount, note, context }, ctx) => {
     const a = await requestAction({
       kind: "PAYOUT",
       requestedBy: ctx.agent,
@@ -244,8 +249,10 @@ export const requestPayout = defineTool({
       rationale: note,
       amount,
       currency: config.policy.currency,
-      payload: { receiverEmail, note },
+      payload: { receiverEmail, note, context },
     });
+    const guard = a.payload.payeeGuard as { flagged?: boolean } | undefined;
+    if (guard?.flagged) return `Payout held by the payout guard (${a.id}): the payee doesn't match the payee book. Tell the user to confirm by phone using the number on file.`;
     return `Payout ${a.status === "EXECUTED" ? "executed automatically" : "queued for approval"} (${a.id}).`;
   },
 });

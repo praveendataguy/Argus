@@ -89,6 +89,14 @@ const STEPS: Step[] = [
     min: 11,
   },
   {
+    title: "Payout redirection scam",
+    tab: "Agent Firewall",
+    focus: ".payout-guard",
+    run: () => quiet(api("/payout-guard/scenario/bec", {})),
+    say: "The costliest scam for small businesses is an email that says: we changed our PayPal, pay this account instead. Argus checks every payout against the payee book. This one imitates a real supplier's domain, so it is held, and only a passkey can release it.",
+    min: 12,
+  },
+  {
     title: "The tribunal",
     tab: "Disputes",
     focus: "main",

@@ -1,6 +1,7 @@
 import { config } from "./config.js";
 import { agentPayments, issueReceipt, releaseReservation } from "./firewall.js";
 import { gatewayFor, paypal } from "./paypal/index.js";
+import { recordScreening, screenPayout, settleScreening } from "./payoutguard.js";
 import { newId, store, type Approval, type ApprovalKind } from "./store.js";
 
 const AUTOPILOT_CEILING = 500;
@@ -30,8 +31,18 @@ export async function requestAction(input: Omit<Approval, "id" | "createdAt" | "
   const approval: Approval = { ...rest, id: newId("APR"), createdAt: new Date().toISOString(), status: "PENDING" };
   const policy = policyAllowsAuto(approval.kind, approval.amount);
   // The agent firewall has already applied the owner's mandate, so it can pre-approve.
-  const { auto, why } = forceAuto && store.autonomy !== "observe" ? { auto: true, why: "Within the agent's mandate and approved by the firewall." } : policy;
+  let { auto, why } = forceAuto && store.autonomy !== "observe" ? { auto: true, why: "Within the agent's mandate and approved by the firewall." } : policy;
+  // Payout guard: every payout is checked against the payee book. A flagged one never runs on its own.
+  const screen = approval.kind === "PAYOUT" ? screenPayout({ receiverEmail: String(approval.payload.receiverEmail ?? ""), amount: approval.amount, note: String(approval.payload.note ?? ""), context: String(approval.payload.context ?? "") }) : undefined;
+  if (screen) {
+    approval.payload.payeeGuard = screen;
+    if (screen.flagged) {
+      auto = false;
+      why = `Payout guard: ${screen.checks.filter((c) => !c.pass).map((c) => c.name.toLowerCase()).join(", ")}. A human must confirm the payee.`;
+    }
+  }
   store.upsertApproval(approval);
+  if (screen) recordScreening(approval, screen);
   store.log({ agent: approval.requestedBy, kind: "decision", message: `Requested: ${approval.title}. ${why}`, data: { approvalId: approval.id } });
   if (auto) {
     approval.autoApproved = true;
@@ -47,6 +58,7 @@ export async function rejectApproval(id: string, by = "human") {
   a.decidedAt = new Date().toISOString();
   store.upsertApproval(a);
   store.log({ agent: by, kind: "action", message: `Rejected: ${a.title}` });
+  if (a.kind === "PAYOUT") settleScreening(a.id, "rejected");
   if (a.kind === "AGENT_PAYMENT") {
     releaseReservation(String(a.payload.agentId), a.amount);
     const p = agentPayments.find((x) => x.id === a.payload.paymentId);
@@ -74,6 +86,7 @@ export async function executeApproval(id: string, by: "human" | "policy" = "huma
   try {
     a.result = await run(a);
     a.status = "EXECUTED";
+    if (a.kind === "PAYOUT") settleScreening(a.id, "paid");
     if (a.kind === "AGENT_PAYMENT") {
       const p = agentPayments.find((x) => x.id === a.payload.paymentId);
       if (p) {
