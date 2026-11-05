@@ -71,6 +71,18 @@ Connect any MCP client:
 
 Tools: `argus_get_mandate(agentId)` (returns the signed `mandateToken`), `argus_pay(agentId, payee, amount, purpose, context?, mandateToken?, nonce?)` (returns the signed receipt).
 
+### 🚩 Payout guard: stop payment redirection scams
+
+The costliest scam for small businesses is an email that looks like a supplier's: "we changed our PayPal, please pay this account instead". Before any PayPal payout moves money, Argus checks it against the **payee book**:
+
+- **Payee on file**: is this exactly the PayPal address we've paid before, or a new one claiming to be a known supplier?
+- **Look-alike address**: `pebble-components.co` imitating `pebblecomponents.com`.
+- **Recent detail change**: payout details changed in the last 14 days, and how the change arrived.
+- **Redirection language**: "we moved banks", "pay this account instead", "please don't call", audit or same-day pressure.
+- **Amount vs history**: more than twice what this payee is usually paid.
+
+A flagged payout **never runs on its own**, in any autonomy mode, and approving it needs the operator's passkey at any amount. The approval card tells the operator to confirm by calling the number already on file. Try it on the Agent Firewall tab with **Scam email: "we changed our PayPal"**.
+
 ### 🔐 Trust center: verify, don't trust
 
 - **Passkey step-up (WebAuthn)**: after an operator enrols a passkey, approving anything above `PASSKEY_STEP_UP_ABOVE` ($100) needs a fresh passkey assertion. The challenge is derived from the hash of that exact approval (id, kind, amount, payload), so what you see is what you sign, and a hijacked session or an edited request can't reuse it. Each step-up is written to the audit log.
