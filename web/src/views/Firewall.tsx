@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ago, api, usd } from "../api";
 import type { AppConfig, AppState } from "../types";
+import { PayoutGuard } from "./PayoutGuard";
 
 interface Mandate {
   agentId: string;
@@ -176,6 +177,8 @@ export function Firewall({ config, state }: { config: AppConfig; state: AppState
           ))}
         </section>
       </div>
+
+      <PayoutGuard state={state} />
     </div>
   );
 }

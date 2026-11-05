@@ -56,7 +56,9 @@ export const passkeyStatus = (rpID: string) => ({
   stepUpAbove: STEP_UP_ABOVE,
 });
 
-export const needsStepUp = (a: Approval, rpID: string) => a.amount > STEP_UP_ABOVE && creds.some((c) => c.rpID === rpID);
+/** Payouts the payout guard flagged need the passkey at any amount: that's the moment a redirection scam succeeds. */
+const payeeFlagged = (a: Approval) => (a.payload?.payeeGuard as { flagged?: boolean } | undefined)?.flagged === true;
+export const needsStepUp = (a: Approval, rpID: string) => (a.amount > STEP_UP_ABOVE || payeeFlagged(a)) && creds.some((c) => c.rpID === rpID);
 
 export async function registrationOptions(rpID: string) {
   const opts = await generateRegistrationOptions({

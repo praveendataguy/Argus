@@ -98,6 +98,9 @@ a { color: #5cc8ff; }
 .tag { background: #f5b94122; color: #f7c55e; border-radius: 6px; padding: 1px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 .approval-title { font-weight: 600; margin: 6px 0 4px; }
 .approval-why { color: var(--muted); margin: 0 0 10px; font-size: 13px; }
+.payee-flag { border: 1px solid var(--red); border-radius: 8px; padding: 8px 10px; margin: 0 0 10px; background: color-mix(in srgb, var(--red) 10%, transparent); }
+.payee-flag ul { margin: 4px 0 6px; padding-left: 18px; }
+.payout-guard { margin-top: 14px; }
 .approval-actions { display: flex; gap: 8px; }
 .decided { display: flex; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--line); font-size: 13px; }
 .decided small { color: var(--muted); }

@@ -90,6 +90,7 @@ export interface Approval {
   autoApproved?: boolean;
   result?: string;
   stepUp?: string;
+  payload?: Record<string, unknown>;
 }
 
 export interface AgentEvent {

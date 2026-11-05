@@ -272,7 +272,9 @@ function ApprovalCard({ a, stepUpAbove }: { a: Approval; stepUpAbove?: number })
       setBusy(false);
     }
   };
-  const stepUp = stepUpAbove !== undefined && a.amount > stepUpAbove;
+  const guard = a.payload?.payeeGuard as { flagged?: boolean; checks?: { name: string; pass: boolean; detail: string }[] } | undefined;
+  const flagged = guard?.flagged === true;
+  const stepUp = stepUpAbove !== undefined && (a.amount > stepUpAbove || flagged);
   return (
     <div className="approval">
       <div className="approval-head">
@@ -281,6 +283,17 @@ function ApprovalCard({ a, stepUpAbove }: { a: Approval; stepUpAbove?: number })
       </div>
       <div className="approval-title">{a.title}</div>
       <p className="approval-why">{a.rationale}</p>
+      {flagged && (
+        <div className="payee-flag small">
+          <b>🚩 Payout guard: possible payment redirection</b>
+          <ul>
+            {guard!.checks!.filter((c) => !c.pass).map((c) => (
+              <li key={c.name}><b>{c.name}:</b> {c.detail}</li>
+            ))}
+          </ul>
+          Call the payee on the number you already have before approving.
+        </div>
+      )}
       <div className="approval-actions">
         <button className="primary" disabled={busy} onClick={() => act("approve")}>
           {stepUp ? "🔑 " : ""}Approve{["REFUND", "PAYOUT", "DISPUTE_ACCEPT", "AGENT_PAYMENT"].includes(a.kind) ? " & move money" : ""}
@@ -289,7 +302,7 @@ function ApprovalCard({ a, stepUpAbove }: { a: Approval; stepUpAbove?: number })
           Reject
         </button>
       </div>
-      {stepUp && <div className="small muted">Above {usd(stepUpAbove!)}: you'll sign this exact approval with your passkey.</div>}
+      {stepUp && <div className="small muted">{flagged ? "Flagged payee" : `Above ${usd(stepUpAbove!)}`}: you'll sign this exact approval with your passkey.</div>}
       {error && <div className="small bad">{error}</div>}
     </div>
   );
@@ -302,6 +315,7 @@ const AGENT_ICON: Record<string, string> = {
   "ring-hunter": "🕸️",
   "red-team": "🗡️",
   "argus-firewall": "🧱",
+  "payout-guard": "🚩",
   "office-bot": "🤖",
   "blue-team": "🛡️",
   "argus-copilot": "💬",
