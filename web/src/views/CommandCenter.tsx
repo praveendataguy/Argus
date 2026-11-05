@@ -50,6 +50,11 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
 
       <ThreatGlobePanel txs={txs} />
 
+      <section className="panel copilot-panel">
+        <h2>Ask Argus</h2>
+        <Copilot enabled={config.aiOnline} />
+      </section>
+
       <section className="sim">
         <span className="sim-label">Live traffic</span>
         <button onClick={() => api("/simulate/normal", {})}>＋ Normal order</button>
@@ -87,7 +92,6 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
             Agent activity <span className="live">● live</span>
           </h2>
           <Feed events={state.events} />
-          <Copilot enabled={config.aiOnline} />
         </section>
       </div>
     </div>
