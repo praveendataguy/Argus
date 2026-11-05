@@ -8,10 +8,16 @@ Small online sellers lose money in three places: fraud they don't catch before s
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 
+![Argus Command Center: live KPIs, agent wire and threat globe](docs/screenshots/command-center.jpg)
+
+| Autonomous investigator | Fraud ring graph | Payout guard |
+|---|---|---|
+| ![Investigator working a case step by step](docs/screenshots/investigator.jpg) | ![Identity graph with a detected fraud ring](docs/screenshots/fraud-rings.jpg) | ![Payout guard holding a look-alike payee](docs/screenshots/payout-guard.jpg) |
+
 ## For judges: try it in two minutes
 
 - **Hosted demo:** https://argus-j237.onrender.com (Render free tier, so the first load can take up to a minute while it wakes).
-- **Run it yourself:** `git clone https://github.com/praveendataguy/Argus && cd argus && npm install && npm run dev`, then open http://localhost:5173. No keys are needed: without them Argus uses a built-in PayPal simulator and an offline rules engine, and every feature still works. Add a free Groq key and PayPal sandbox keys to `.env` for live AI and real sandbox payments (see [Run it locally](#run-it-locally)).
+- **Run it yourself:** `git clone https://github.com/praveendataguy/Argus.git argus && cd argus && npm install && npm run dev`, then open http://localhost:5173. No keys are needed: without them Argus uses a built-in PayPal simulator and an offline rules engine, and every feature still works. Add a free Groq key and PayPal sandbox keys to `.env` for live AI and real sandbox payments (see [Run it locally](#run-it-locally)).
 - **Then:** press **▶ Live demo** in the header for a narrated tour, or open the **Investigator** tab and press **Investigate suspicious** to watch Argus work fraud cases on its own.
 
 | Agent | Watches | Does | PayPal APIs |
@@ -150,7 +156,7 @@ Agents can't move money directly. They can only *request* an action, and the pol
 Requires Node 20+.
 
 ```bash
-git clone <this repo> && cd argus
+git clone https://github.com/praveendataguy/Argus.git argus && cd argus
 npm install
 cp .env.example .env      # optional: add PayPal sandbox keys and a free Groq key
 npm run dev               # API on :8787, dashboard on http://localhost:5173
