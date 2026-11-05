@@ -69,8 +69,11 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
       </section>
 
       <div className="cc-grid">
-        <section className="panel">
-          <h2>Approval queue</h2>
+        <section className="panel queue-panel">
+          <h2>
+            Approval queue {pending.length > 0 && <span className="muted small">{pending.length} waiting</span>}
+          </h2>
+          <div className="queue-scroll">
           {pending.length === 0 && <p className="empty">Nothing needs you right now. Agents are within policy.</p>}
           {pending.map((a) => (
             <ApprovalCard key={a.id} a={a} stepUpAbove={passkeys?.enrolled.length ? passkeys.stepUpAbove : undefined} />
@@ -85,6 +88,7 @@ export function CommandCenter({ config, state }: { config: AppConfig; state: App
               </div>
             </div>
           ))}
+          </div>
         </section>
 
         <div className="cc-side">
