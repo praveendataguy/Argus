@@ -1,5 +1,7 @@
 # 👁️ Argus
 
+[![CI](https://github.com/praveendataguy/Argus/actions/workflows/ci.yml/badge.svg)](https://github.com/praveendataguy/Argus/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **An autonomous AI back office that guards a PayPal merchant account.**
 
 *Named after Argus Panoptes, the hundred-eyed watchman of Greek myth: many agents, always watching, and a human holding the leash.*

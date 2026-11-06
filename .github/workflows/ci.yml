@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck server and web
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Smoke test (server boots and serves the API)
+        run: |
+          PORT=8787 npm start > server.log 2>&1 &
+          for i in $(seq 1 30); do curl -sf http://localhost:8787/api/config > /dev/null && break; sleep 1; done
+          curl -sf http://localhost:8787/api/config > /dev/null || { cat server.log; exit 1; }
+          curl -sf http://localhost:8787/api/audit/verify | grep -q '"ok":true'
+          curl -sf http://localhost:8787/ | grep -qi '<div id="root"'
