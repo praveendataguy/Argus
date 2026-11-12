@@ -1,14 +1,18 @@
 # 👁️ Argus
 
-[![CI](https://github.com/praveendataguy/Argus/actions/workflows/ci.yml/badge.svg)](https://github.com/praveendataguy/Argus/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/praveendataguy/Argus/actions/workflows/ci.yml/badge.svg)](https://github.com/praveendataguy/Argus/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Demo video](https://img.shields.io/badge/demo-YouTube-red.svg)](https://youtu.be/wE9cwRtqOmQ)
 
 **An autonomous AI back office that guards a PayPal merchant account.**
 
 *Named after Argus Panoptes, the hundred-eyed watchman of Greek myth: many agents, always watching, and a human holding the leash.*
 
-Small online sellers lose money in three places: fraud they don't catch before shipping, disputes they don't have time to fight (or fight when they shouldn't), and billing that slips. Argus puts a team of AI agents in charge of the PayPal account, with a policy engine and a human approval queue in front of every dollar that moves.
+**▶ [Demo video (under 3 min)](https://youtu.be/wE9cwRtqOmQ) · 🌐 [Live app](https://argus-j237.onrender.com) · 📄 [MIT license](LICENSE)**
+
+Small online sellers lose money in four places: fraud they don't catch before shipping, disputes they don't have time to fight (or fight when they shouldn't), billing that slips, and scam emails that redirect payouts ("we changed our PayPal, pay this account instead"). Argus puts a team of AI agents in charge of the PayPal account, with a policy engine and a human approval queue in front of every dollar that moves.
 
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
+
+**PayPal APIs used:** Orders v2, Payments v2 (captures and refunds), Disputes v1, Invoicing v2, Payouts v1, Webhooks (with signature verification), and the PayPal JS SDK for checkout. **AI:** Groq (`openai/gpt-oss-120b`) by default, Claude optional, plus an in-app explainable ML model. Details in [AI tools used](#ai-tools-used).
 
 ![Argus Command Center: live KPIs, agent wire and threat globe](docs/screenshots/command-center.jpg)
 
@@ -18,9 +22,24 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 
 ## For judges: try it in two minutes
 
+- **Demo video (under 3 minutes):** https://youtu.be/wE9cwRtqOmQ
 - **Hosted demo:** https://argus-j237.onrender.com (Render free tier, so the first load can take up to a minute while it wakes).
 - **Run it yourself:** `git clone https://github.com/praveendataguy/Argus.git argus && cd argus && npm install && npm run dev`, then open http://localhost:5173. No keys are needed: without them Argus uses a built-in PayPal simulator and an offline rules engine, and every feature still works. Add a free Groq key and PayPal sandbox keys to `.env` for live AI and real sandbox payments (see [Run it locally](#run-it-locally)).
-- **Then:** press **▶ Live demo** in the header for a narrated tour, or open the **Investigator** tab and press **Investigate suspicious** to watch Argus work fraud cases on its own.
+- **Then:** press **▶ Live demo** in the header for a narrated, hands-free two-minute tour of the main features.
+
+**Prefer to click around? Five things worth trying:**
+
+| # | Where | Click | What you should see |
+|---|---|---|---|
+| 1 | Command Center | **🌪️ Global storm** | 14 payments fly across the globe; attacks are held or refunded, honest orders pass. |
+| 2 | Investigator | **Investigate N suspicious** | Argus works each case in 7 visible steps and ends with a verdict and a plain-English reason. |
+| 3 | Agent Firewall | **Scam email: "we changed our PayPal"** | The payout to a look-alike domain is held and needs a passkey to release. |
+| 4 | Trust Center | Pick a sample token, then **🧨 Tamper with it** | The token's spending limit is raised and its signature check fails. |
+| 5 | Observability | **🔗 Verify chain** | Every audit entry's hash link is recomputed and confirmed intact. |
+
+You can also type into **Ask Argus** on the Command Center, e.g. "Which orders today look riskiest and why?".
+
+## The agents
 
 | Agent | Watches | Does | PayPal APIs |
 |---|---|---|---|
@@ -33,7 +52,20 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 | **Investigator** 🕵️ | Every held or high-risk payment | Works the whole case on its own (order, history, signals, identity network, geography), reaches a verdict with a plain-English reason, then freezes rings, cancels, or releases | Orders v2, Payments v2 (refunds) |
 | **Intent judge** 🧱 | Payments requested by other AI agents | Independently judges each payment against the owner's mandate | Payouts v1 |
 | **Tribunal** ⚖️ (counsel, advocate, judge) | Disputes | Adversarial debate with an independent ruling that must flag unsupported claims | Disputes v1 |
+| **Payout guard** 🚩 | Every outgoing payout | Checks the payee against the payee book, look-alike domains and redirection language; holds anything suspicious for a passkey | Payouts v1 |
 | **ML model** 📈 | Every order, every war-game wave | Explainable second opinion, retrained after each round | — |
+
+## Guardrails: AI behind the wheel, human on the brake
+
+Every money-moving or customer-facing action goes through one policy engine (`server/src/actions.ts`). The merchant chooses how much autonomy the agents get:
+
+- **Observe**: agents only propose. A human executes everything.
+- **Guarded** (default): refunds and payouts up to `AUTO_APPROVE_LIMIT` ($25) run on their own. Anything larger, and anything a customer will read (dispute responses, invoices), waits in the approval queue.
+- **Autopilot**: agents act on their own up to a hard $500 ceiling.
+
+Agents can't move money directly. They can only *request* an action, and the policy engine decides whether it runs now or waits for a human.
+
+## Features in detail
 
 ### 🎬 One-click live demo
 
@@ -109,22 +141,12 @@ Next to the rules, Argus trains a logistic regression in-process on 14 interpret
 
 The 🎙️ button in the header uses the browser's Web Speech API. You can say "open fraud rings", "run a risk sweep", "play a war game round", "simulate a card-testing attack" or "verify the audit log", or ask the copilot anything. Voice is limited on purpose: it can never approve money or switch to Autopilot.
 
-### 📈 Observability and tamper-evident audit
+### 📊 Observability and tamper-evident audit
 
 - **Hash-chained audit log** (`data/audit.jsonl`): every agent decision, tool call, approval and PayPal API call is appended with a SHA-256 hash that also covers the previous entry. **Verify chain** recomputes every link, so editing or deleting any past record is detected, along with exactly where. The log can be exported as JSONL.
 - **Run traces**: each agent run records its model, steps, input, output and cache tokens, cost in USD, latency, and a span per tool call.
 - **Metrics**: per-agent runs, average and p95 latency, errors and spend; per-endpoint PayPal call counts, latency and failures; and the split of money decisions made by policy versus by a human.
 - **Optional Elastic sink**: set `ELASTIC_URL` and `ELASTIC_API_KEY` and audit entries are bulk-indexed into Elastic (`argus-audit`) for search and dashboards.
-
-### Guardrails: AI behind the wheel, human on the brake
-
-Every money-moving or customer-facing action goes through one policy engine (`server/src/actions.ts`). The merchant chooses how much autonomy the agents get:
-
-- **Observe**: agents only propose. A human executes everything.
-- **Guarded** (default): refunds and payouts up to `AUTO_APPROVE_LIMIT` ($25) run on their own. Anything larger, and anything a customer will read (dispute responses, invoices), waits in the approval queue.
-- **Autopilot**: agents act on their own up to a hard $500 ceiling.
-
-Agents can't move money directly. They can only *request* an action, and the policy engine decides whether it runs now or waits for a human.
 
 ## Architecture
 
@@ -164,7 +186,7 @@ cp .env.example .env      # optional: add PayPal sandbox keys and a free Groq ke
 npm run dev               # API on :8787, dashboard on http://localhost:5173
 ```
 
-The app runs in three configurations:
+The app runs in four configurations:
 
 | `.env` | PayPal | AI |
 |---|---|---|
@@ -189,6 +211,10 @@ npm run build && npm start   # http://localhost:8787
 4. Open the **Storefront** tab and pay with a sandbox personal account. The real capture shows up in the Command Center and Risk Watch screens it within seconds. Refunds you approve on it are real sandbox refunds.
 
 The seeded history (about 40 orders and 3 disputes for the demo shop "Nimbus Audio") and the traffic simulator buttons use the simulator gateway, because PayPal's sandbox can't produce card-testing bursts or account takeovers on demand. Anything that goes through real checkout uses the real sandbox APIs.
+
+## Quality checks
+
+[GitHub Actions CI](https://github.com/praveendataguy/Argus/actions/workflows/ci.yml) runs on every push and pull request: a clean `npm ci`, TypeScript typecheck of server and dashboard, a production build, then a smoke test that boots the server with no keys and checks the API, the audit hash chain and the dashboard page.
 
 ## Deploy
 
