@@ -1,6 +1,6 @@
 # 👁️ Argus
 
-[![CI](https://github.com/praveendataguy/Argus/actions/workflows/ci.yml/badge.svg)](https://github.com/praveendataguy/Argus/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/praveendataguy/Argus/actions/workflows/ci.yml/badge.svg)](https://github.com/praveendataguy/Argus/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Demo video](https://img.shields.io/badge/demo-YouTube-red.svg)](https://youtu.be/wE9cwRtqOmQ)
 
 **An autonomous AI back office that guards a PayPal merchant account.**
 
@@ -18,6 +18,7 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/).
 
 ## For judges: try it in two minutes
 
+- **Demo video (under 3 minutes):** https://youtu.be/wE9cwRtqOmQ
 - **Hosted demo:** https://argus-j237.onrender.com (Render free tier, so the first load can take up to a minute while it wakes).
 - **Run it yourself:** `git clone https://github.com/praveendataguy/Argus.git argus && cd argus && npm install && npm run dev`, then open http://localhost:5173. No keys are needed: without them Argus uses a built-in PayPal simulator and an offline rules engine, and every feature still works. Add a free Groq key and PayPal sandbox keys to `.env` for live AI and real sandbox payments (see [Run it locally](#run-it-locally)).
 - **Then:** press **▶ Live demo** in the header for a narrated tour, or open the **Investigator** tab and press **Investigate suspicious** to watch Argus work fraud cases on its own.
